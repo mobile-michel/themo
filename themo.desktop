@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Thémo
+GenericName=Générateur de design système
+Comment=Créer un design système et l'exporter en fichier CSS
+Exec=python3 /home/michel/NAS/web-projects/07-APPS-LINUX/App_CSS/themo.py
+Icon=applications-graphics
+Terminal=false
+Categories=Development;WebDevelopment;GTK;
+Keywords=css;design;system;tokens;theme;
