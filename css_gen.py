@@ -21,7 +21,8 @@ from tokens import (
 
 def _sem(background, surface, text, muted, border, border_strong,
          accent, accent_hover, accent_soft, on_accent,
-         link, link_hover, focus, code_bg, selection):
+         link, link_hover, focus, code_bg, selection,
+         highlight, highlight_text):
     return {
         "background": background, "surface": surface,
         "text": text, "text-muted": muted,
@@ -31,6 +32,7 @@ def _sem(background, surface, text, muted, border, border_strong,
         "link": link, "link-hover": link_hover,
         "focus-ring": focus, "code-background": code_bg,
         "selection-background": selection,
+        "highlight": highlight, "highlight-text": highlight_text,
     }
 
 
@@ -47,7 +49,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 700), _v("primary", 800),
                       _v("primary", 400), _v("neutral", 100),
-                      _v("primary", 200)),
+                      _v("primary", 200),
+                      _v("secondary", 100), _v("secondary", 900)),
         "dark": _sem(_v("neutral", 900), _v("neutral", 800),
                      _v("neutral", 100), _v("neutral", 400),
                      _v("neutral", 700), _v("neutral", 600),
@@ -55,7 +58,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 300), _v("primary", 200),
                      _v("primary", 500), _v("neutral", 800),
-                     _v("primary", 800)),
+                     _v("primary", 800),
+                     _v("secondary", 800), _v("secondary", 50)),
     },
     "Doux": {
         "light": _sem(_v("primary", 50), "#ffffff",
@@ -65,7 +69,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 600), _v("primary", 700),
                       _v("primary", 300), _v("primary", 50),
-                      _v("primary", 100)),
+                      _v("primary", 100),
+                      _v("secondary", 100), _v("secondary", 800)),
         "dark": _sem(_v("neutral", 900), _v("neutral", 800),
                      _v("neutral", 200), _v("neutral", 400),
                      _v("neutral", 800), _v("neutral", 700),
@@ -73,7 +78,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 300), _v("primary", 200),
                      _v("primary", 500), _v("neutral", 800),
-                     _v("primary", 800)),
+                     _v("primary", 800),
+                     _v("secondary", 800), _v("secondary", 100)),
     },
     "Contrasté": {
         "light": _sem("#ffffff", "#ffffff",
@@ -83,7 +89,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 800), _v("primary", 900),
                       _v("primary", 600), _v("neutral", 100),
-                      _v("primary", 200)),
+                      _v("primary", 200),
+                      _v("secondary", 200), _v("secondary", 900)),
         "dark": _sem("#000000", _v("neutral", 900),
                      "#ffffff", _v("neutral", 300),
                      _v("neutral", 600), _v("neutral", 500),
@@ -91,7 +98,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 200), _v("primary", 100),
                      _v("primary", 400), _v("neutral", 900),
-                     _v("primary", 700)),
+                     _v("primary", 700),
+                     _v("secondary", 700), _v("secondary", 50)),
     },
 }
 
@@ -232,8 +240,8 @@ hr {
 }
 
 mark {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: var(--highlight);
+  color: var(--highlight-text);
   padding: 0.1em 0.3em;
   border-radius: var(--radius-sm);
 }
@@ -486,9 +494,9 @@ def generate_css(cfg: Config) -> str:
     semantic = SEMANTIC_TEMPLATES[cfg.semantic_template]
 
     root = []
-    if cfg.include_dark:
-        root.append("color-scheme: light dark;")
-        root.append("")
+    root.append("color-scheme: light dark;" if cfg.include_dark
+                else "color-scheme: light;")
+    root.append("")
     root.append("/* Couleurs primitives */")
     for name, scale in (("primary", primary), ("secondary", secondary),
                         ("neutral", neutral)):
@@ -546,7 +554,12 @@ def generate_css(cfg: Config) -> str:
             "",
             f"@media (prefers-color-scheme: dark) {{\n{media_inner}\n}}",
             "",
-            _block(':root[data-theme="dark"]', dark_lines),
+            # color-scheme explicite quand un thème est forcé, sinon les
+            # contrôles natifs (select, case à cocher…) suivent le système
+            _block(':root[data-theme="light"]', ["color-scheme: light;"]),
+            "",
+            _block(':root[data-theme="dark"]',
+                   ["color-scheme: dark;"] + dark_lines),
         ]
 
     parts += [

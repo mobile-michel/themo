@@ -28,8 +28,9 @@ PAGES = {
 <main>
   <section>
     <h1>Concevez vos interfaces avec un système, pas au hasard</h1>
-    <p>Atelier Lumen unifie couleurs, typographie et espacements dans une
-       seule feuille de styles, prête à servir tous vos projets.</p>
+    <p>Atelier Lumen unifie couleurs, typographie et espacements dans
+       <mark>une seule feuille de styles</mark>, prête à servir tous
+       vos projets.</p>
     <p>
       <button>Commencer gratuitement</button>
       <a href="#">Voir la démonstration</a>
@@ -168,7 +169,7 @@ PAGES = {
 <main>
   <h1>Nous contacter</h1>
   <p>Une question, un problème&nbsp;? Remplissez ce formulaire,
-     nous répondons sous 24&nbsp;heures.</p>
+     nous répondons <mark>sous 24&nbsp;heures</mark>.</p>
 
   <form>
     <fieldset>

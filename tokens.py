@@ -11,17 +11,32 @@ from dataclasses import dataclass, field
 # Configuration : les seuls tokens saisis par l'utilisateur
 # ---------------------------------------------------------------------------
 
+# Classification de https://modernfontstacks.com/ — piles de polices système
+# uniquement, aucun téléchargement de webfont nécessaire.
+# Classées par famille : sans-serif, puis serif, puis monospace (et cursive).
 FONT_STACKS = {
-    "Système (sans-serif)": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-    "Inter": "'Inter', system-ui, sans-serif",
-    "Roboto": "'Roboto', system-ui, sans-serif",
-    "Open Sans": "'Open Sans', system-ui, sans-serif",
-    "Système (serif)": "Georgia, 'Times New Roman', serif",
-    "Georgia": "Georgia, serif",
-    "Playfair Display": "'Playfair Display', Georgia, serif",
+    # Sans-serif
+    "System UI": "system-ui, sans-serif",
+    "Humanist": "Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif",
+    "Geometric Humanist": "Avenir, Montserrat, Corbel, 'URW Gothic', source-sans-pro, sans-serif",
+    "Classical Humanist": "Optima, Candara, 'Noto Sans', source-sans-pro, sans-serif",
+    "Neo-Grotesque": "Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif",
+    "Industrial": "Bahnschrift, 'DIN Alternate', 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif",
+    "Rounded Sans": "ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif",
+    # Serif
+    "Transitional": "Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif",
+    "Old Style": "'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, serif",
+    "Slab Serif": "Rockwell, 'Rockwell Nova', 'Roboto Slab', 'DejaVu Serif', 'Sitka Small', serif",
+    "Antique": "Superclarendon, 'Bookman Old Style', 'URW Bookman', 'URW Bookman L', 'Georgia Pro', Georgia, serif",
+    "Didone": "Didot, 'Bodoni MT', 'Noto Serif Display', 'URW Palladio L', P052, Sylfaen, serif",
+    # Monospace
+    "Monospace Code": "ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace",
+    "Monospace Slab Serif": "'Nimbus Mono PS', 'Courier New', monospace",
+    # Cursive
+    "Handwritten": "'Segoe Print', 'Bradley Hand', Chilanka, TSCu_Comic, casual, cursive",
 }
 
-FONT_MONO = "ui-monospace, 'JetBrains Mono', 'Fira Code', Consolas, monospace"
+FONT_MONO = FONT_STACKS["Monospace Code"]
 
 # (libellé affiché, valeur)
 RATIOS = [
@@ -41,8 +56,8 @@ SPACING_BASES = [4, 8]
 class Config:
     primary: str = "#3b82f6"
     secondary: str = "#f59e0b"
-    font_heading: str = "Système (sans-serif)"
-    font_body: str = "Système (sans-serif)"
+    font_heading: str = "System UI"
+    font_body: str = "System UI"
     base_size: int = 16          # px — taille du texte courant
     ratio: float = 1.25          # ratio de l'échelle typographique
     spacing_base: int = 4        # px — unité d'espacement

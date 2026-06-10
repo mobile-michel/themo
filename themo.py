@@ -47,6 +47,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         self.cfg = Config()
         self._refresh_id = 0
+        self._resets = []  # remises aux valeurs par défaut (tokens seulement)
 
         self.set_title("Thémo")
         self.set_default_size(1280, 860)
@@ -100,9 +101,11 @@ class ThemoWindow(Adw.ApplicationWindow):
             description="Tokens sémantiques et styles des éléments HTML",
         )
         grp.add(self._combo_row(
-            "Sémantique", list(SEMANTIC_TEMPLATES), "semantic_template"))
+            "Sémantique", list(SEMANTIC_TEMPLATES), "semantic_template",
+            resettable=False))
         grp.add(self._combo_row(
-            "Éléments HTML", list(ELEMENT_TEMPLATES), "element_template"))
+            "Éléments HTML", list(ELEMENT_TEMPLATES), "element_template",
+            resettable=False))
         dark = Adw.SwitchRow(title="Inclure le mode sombre")
         dark.set_active(self.cfg.include_dark)
         dark.connect("notify::active", self._on_switch, "include_dark")
@@ -112,6 +115,11 @@ class ThemoWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(
             title="Thémo", subtitle="Design système → CSS"))
+        reset = Gtk.Button(
+            icon_name="edit-undo-symbolic",
+            tooltip_text="Réinitialiser les tokens (les templates sont conservés)")
+        reset.connect("clicked", self._reset_tokens)
+        header.pack_start(reset)
 
         view = Adw.ToolbarView()
         view.add_top_bar(header)
@@ -121,30 +129,36 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _color_row(self, title, attr):
         row = Adw.ActionRow(title=title)
         btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog())
-        rgba = Gdk.RGBA()
-        rgba.parse(getattr(self.cfg, attr))
-        btn.set_rgba(rgba)
+        default = Gdk.RGBA()
+        default.parse(getattr(self.cfg, attr))
+        btn.set_rgba(default)
         btn.set_valign(Gtk.Align.CENTER)
         btn.connect("notify::rgba", self._on_color, attr)
+        self._resets.append(lambda: btn.set_rgba(default))
         row.add_suffix(btn)
         row.set_activatable_widget(btn)
         return row
 
-    def _combo_row(self, title, labels, attr, values=None, default_index=0):
+    def _combo_row(self, title, labels, attr, values=None, default_index=0,
+                   resettable=True):
         row = Adw.ComboRow(title=title)
         row.set_model(Gtk.StringList.new(labels))
         current = getattr(self.cfg, attr)
         options = values if values is not None else labels
-        row.set_selected(
-            options.index(current) if current in options else default_index)
+        index = options.index(current) if current in options else default_index
+        row.set_selected(index)
         row.connect("notify::selected", self._on_combo, attr, options)
+        if resettable:
+            self._resets.append(lambda: row.set_selected(index))
         return row
 
     def _spin_row(self, title, lo, hi, attr):
         row = Adw.SpinRow.new_with_range(lo, hi, 1)
         row.set_title(title)
-        row.set_value(getattr(self.cfg, attr))
+        default = getattr(self.cfg, attr)
+        row.set_value(default)
         row.connect("notify::value", self._on_spin, attr)
+        self._resets.append(lambda: row.set_value(default))
         return row
 
     # -- Zone d'aperçu -------------------------------------------------------
@@ -190,6 +204,21 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _on_spin(self, row, _pspec, attr):
         setattr(self.cfg, attr, int(row.get_value()))
         self._schedule_refresh()
+
+    # Tokens remis à zéro par le bouton — les templates n'en font pas partie
+    _TOKEN_ATTRS = ("primary", "secondary", "font_heading", "font_body",
+                    "base_size", "ratio", "spacing_base", "radius",
+                    "shadow_alpha")
+
+    def _reset_tokens(self, *_args):
+        defaults = Config()
+        for attr in self._TOKEN_ATTRS:
+            setattr(self.cfg, attr, getattr(defaults, attr))
+        for restore in self._resets:
+            restore()
+        self._schedule_refresh()
+        self.toasts.add_toast(Adw.Toast(
+            title="Tokens réinitialisés (templates conservés)"))
 
     def _on_switch(self, row, _pspec, attr):
         setattr(self.cfg, attr, row.get_active())
