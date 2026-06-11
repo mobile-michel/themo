@@ -22,6 +22,8 @@ Le CSS généré a trois étages :
 2. **Tokens sémantiques** (`--background`, `--text`, `--accent`…) via un template au choix — *Neutre*, *Doux*, *Contrasté* — déclinés en clair et en sombre (`prefers-color-scheme` + `data-theme`) ;
 3. **Styles appliqués directement aux éléments HTML** (`body`, `h1`, `a`, `button`, `table`, formulaires…) via un second template — *Moderne*, *Classique*, *Minimal*. Aucune classe : le HTML reste nu.
 
+Un parcours guidé pas à pas est disponible dans [TUTORIEL.md](TUTORIEL.md).
+
 ## Lancement
 
 ```bash
