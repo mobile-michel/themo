@@ -30,10 +30,10 @@ python3 themo.py
 
 Dépendances (présentes sur la plupart des distributions avec GNOME) : `python3-gi`, GTK 4, libadwaita ≥ 1.5, WebKitGTK 6.0 et GtkSourceView 5 (`gir1.2-webkit-6.0` et `gir1.2-gtksource-5` sous Debian/Ubuntu).
 
-Pour l'avoir dans le menu d'applications :
+Pour l'avoir dans le menu d'applications (le script injecte le chemin du dépôt dans le lanceur) :
 
 ```bash
-cp themo.desktop ~/.local/share/applications/
+./install.sh
 ```
 
 ## Utilisation
