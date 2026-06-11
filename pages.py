@@ -243,6 +243,141 @@ BLANK_PAGE = """\
 MODELS = {"Page vide": BLANK_PAGE, **PAGES}
 
 
+# ---------------------------------------------------------------------------
+# Blocs de composition — fragments sans classes, conformes au design système.
+# Chaque entrée : nom -> (emplacement, html). Emplacements :
+#   "hero"  pleine largeur, avant <main> ;
+#   "main"  dans le contenu, avant </main>.
+# ---------------------------------------------------------------------------
+
+BLOCKS = {
+    "Héro pleine largeur": ("hero", """\
+<section>
+  <h1>Un titre qui annonce la couleur</h1>
+  <p>Une ou deux phrases pour situer le propos et donner envie
+     de poursuivre la lecture.</p>
+  <p>
+    <button>Action principale</button>
+    <a href="#">Action secondaire</a>
+  </p>
+</section>
+"""),
+    "Titre et texte": ("main", """\
+  <section>
+    <h2>Titre de section</h2>
+    <p>Premier paragraphe. Présentez l'idée principale en quelques
+       phrases courtes et concrètes.</p>
+    <p>Second paragraphe, pour développer ou nuancer.</p>
+  </section>
+"""),
+    "Grille de cartes": ("main", """\
+  <section>
+    <h2>Trois points clés</h2>
+    <article>
+      <h3>Premier point</h3>
+      <p>Une phrase ou deux pour décrire ce point.</p>
+    </article>
+    <article>
+      <h3>Deuxième point</h3>
+      <p>Une phrase ou deux pour décrire ce point.</p>
+    </article>
+    <article>
+      <h3>Troisième point</h3>
+      <p>Une phrase ou deux pour décrire ce point.</p>
+    </article>
+  </section>
+"""),
+    "Tableau": ("main", """\
+  <section>
+    <h2>Comparatif</h2>
+    <table>
+      <caption>Légende du tableau</caption>
+      <thead>
+        <tr><th>Critère</th><th>Option A</th><th>Option B</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Premier critère</td><td>oui</td><td>non</td></tr>
+        <tr><td>Deuxième critère</td><td>non</td><td>oui</td></tr>
+        <tr><td>Troisième critère</td><td>oui</td><td>oui</td></tr>
+      </tbody>
+    </table>
+  </section>
+"""),
+    "Citation": ("main", """\
+  <section>
+    <blockquote>
+      <p>«&nbsp;Une citation marquante, mise en valeur par la couleur
+         secondaire du design système.&nbsp;»</p>
+      <p><small>— Prénom Nom, fonction</small></p>
+    </blockquote>
+  </section>
+"""),
+    "Formulaire de contact": ("main", """\
+  <section>
+    <h2>Nous écrire</h2>
+    <form>
+      <label for="bloc-nom">Nom</label>
+      <input id="bloc-nom" type="text" placeholder="Votre nom">
+      <label for="bloc-email">Adresse e-mail</label>
+      <input id="bloc-email" type="email" placeholder="vous@exemple.fr">
+      <label for="bloc-message">Message</label>
+      <textarea id="bloc-message" placeholder="Votre message…"></textarea>
+      <button type="submit">Envoyer</button>
+    </form>
+  </section>
+"""),
+    "Questions fréquentes": ("main", """\
+  <section>
+    <h2>Questions fréquentes</h2>
+    <details>
+      <summary>Première question&nbsp;?</summary>
+      <p>La réponse, en une ou deux phrases.</p>
+    </details>
+    <details>
+      <summary>Seconde question&nbsp;?</summary>
+      <p>La réponse, en une ou deux phrases.</p>
+    </details>
+  </section>
+"""),
+    "Illustration": ("main", f"""\
+  <section>
+    <figure>
+      <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer">
+      <figcaption>Légende de l'illustration.</figcaption>
+    </figure>
+  </section>
+"""),
+    "Séparateur": ("main", "  <hr>\n"),
+}
+
+
+def insert_block(body: str, name: str) -> str:
+    """Insère un bloc dans le corps de page, à l'emplacement qui lui revient.
+
+    Héro : avant <main>, sinon après </header>, sinon en tête.
+    Contenu : avant </main>, sinon avant <footer>, sinon à la fin.
+    """
+    placement, html = BLOCKS[name]
+    if placement == "hero":
+        i = body.find("<main")
+        if i != -1:
+            return body[:i] + html + body[i:]
+        i = body.find("</header>")
+        if i != -1:
+            j = i + len("</header>")
+            if body[j:j + 1] == "\n":
+                j += 1
+            return body[:j] + html + body[j:]
+        return html + body
+    i = body.rfind("</main>")
+    if i != -1:
+        return body[:i] + html + body[i:]
+    i = body.rfind("<footer")
+    if i != -1:
+        return body[:i] + html + body[i:]
+    return body + html
+
+
 def wrap_preview(body: str, css: str, theme: str | None = None) -> str:
     """Page complète avec CSS embarqué, pour l'aperçu WebKit."""
     attr = f' data-theme="{theme}"' if theme else ""

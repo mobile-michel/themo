@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.7.0 — Composition par blocs (11 juin 2026)
+
+**Description courte :** un menu « + » insère dans la page courante des blocs prêts à l'emploi, garantis sans classe CSS et placés automatiquement au bon endroit — dernière phase de l'étude de faisabilité.
+
+**Explication commentée :**
+
+- *Neuf blocs* — Héro pleine largeur ; Titre et texte ; Grille de cartes ; Tableau ; Citation (couleur secondaire) ; Formulaire de contact ; Questions fréquentes ; Illustration (SVG embarqué) ; Séparateur. Tous consomment le design système, sans aucune classe.
+- *Insertion intelligente* — `insert_block()` place le héro avant `<main>` (sinon après `</header>`, sinon en tête) et les blocs de contenu avant `</main>` (sinon avant `<footer>`, sinon en fin) ; une page se compose entièrement depuis une page vide, l'éditeur source servant à réorganiser.
+- *Intégration* — menu « + » dans l'en-tête (sections Pleine largeur / Dans le contenu), action paramétrée `win.block-insert`, synchronisation de l'éditeur source, rechargement complet de l'aperçu même en mode WYSIWYG, pastille ● et toast.
+- *Bilan de l'étude* — les trois approches coexistent désormais : blocs pour la structure garantie, éditeur HTML pour le contrôle fin, WYSIWYG pour le texte.
+
+---
+
 ## v1.6.0 — Édition WYSIWYG du texte dans l'aperçu (11 juin 2026)
 
 **Description courte :** l'aperçu devient directement éditable au clic (designMode), avec synchronisation au fil de la frappe et mise à jour des tokens sans rechargement de la page.

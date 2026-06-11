@@ -33,7 +33,8 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GtkSource, WebKit  # noqa: E
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
-from pages import MODELS, wrap_preview, wrap_export  # noqa: E402
+from pages import (MODELS, BLOCKS, insert_block,  # noqa: E402
+                   wrap_preview, wrap_export)
 from project import Project, slugify  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
@@ -232,9 +233,25 @@ class ThemoWindow(Adw.ApplicationWindow):
         pages_btn = Gtk.MenuButton(icon_name="view-more-symbolic",
                                    menu_model=pages_menu,
                                    tooltip_text="Gérer les pages")
+
+        full_width = Gio.Menu()
+        in_content = Gio.Menu()
+        for block_name, (placement, _html) in BLOCKS.items():
+            item = Gio.MenuItem.new(block_name, None)
+            item.set_action_and_target_value(
+                "win.block-insert", GLib.Variant.new_string(block_name))
+            (full_width if placement == "hero" else in_content).append_item(item)
+        blocks_menu = Gio.Menu()
+        blocks_menu.append_section("Pleine largeur", full_width)
+        blocks_menu.append_section("Dans le contenu", in_content)
+        blocks_btn = Gtk.MenuButton(icon_name="list-add-symbolic",
+                                    menu_model=blocks_menu,
+                                    tooltip_text="Insérer un bloc dans la page")
+
         title_box = Gtk.Box(spacing=6)
         title_box.append(self.page_selector)
         title_box.append(pages_btn)
+        title_box.append(blocks_btn)
 
         self.dark_toggle = Gtk.ToggleButton(
             icon_name="weather-clear-night-symbolic",
@@ -482,6 +499,17 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._rebuild_page_selector(select=new)
         dialog.choose(self, None, done)
 
+    def _block_insert(self, _action, param):
+        name = param.get_string()
+        current = self._current_page_name()
+        self.project.pages[current] = insert_block(
+            self.project.pages[current], name)
+        self._touch()
+        self._load_page_into_editor()
+        self._loaded_page = None  # forcer un rechargement complet de l'aperçu
+        self._schedule_refresh()
+        self.toasts.add_toast(Adw.Toast(title=f"Bloc « {name} » inséré"))
+
     def _page_delete(self, *_args):
         current = self._current_page_name()
         if len(self.project.pages) == 1:
@@ -657,6 +685,10 @@ class ThemoWindow(Adw.ApplicationWindow):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
             self.add_action(action)
+        action = Gio.SimpleAction.new("block-insert",
+                                      GLib.VariantType.new("s"))
+        action.connect("activate", self._block_insert)
+        self.add_action(action)
 
     def _export_css(self, *_args):
         dialog = Gtk.FileDialog(initial_name="design-system.css")
