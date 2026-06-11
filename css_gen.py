@@ -10,7 +10,7 @@ Trois étages, sans aucune classe CSS :
 from datetime import date
 
 from tokens import (
-    Config, FONT_STACKS, FONT_MONO,
+    Config, FONT_STACKS,
     color_scale, type_scale, spacing_scale, radius_scale, shadow_scale,
 )
 
@@ -505,7 +505,7 @@ def generate_css(cfg: Config) -> str:
     root.append("/* Typographie */")
     root.append(f"--font-heading: {FONT_STACKS[cfg.font_heading]};")
     root.append(f"--font-body: {FONT_STACKS[cfg.font_body]};")
-    root.append(f"--font-mono: {FONT_MONO};")
+    root.append(f"--font-mono: {FONT_STACKS[cfg.font_mono]};")
     root += [f"--text-{name}: {value};" for name, value in texts.items()]
     root.append("--leading-tight: 1.2;")
     root.append("--leading-normal: 1.65;")

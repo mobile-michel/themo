@@ -36,7 +36,14 @@ FONT_STACKS = {
     "Handwritten": "'Segoe Print', 'Bradley Hand', Chilanka, TSCu_Comic, casual, cursive",
 }
 
-FONT_MONO = FONT_STACKS["Monospace Code"]
+# Classifications proposées pour les titres, le texte courant et le code,
+# dans cet ordre précis.
+HEADING_FONTS = ["Geometric Humanist", "Industrial", "Rounded Sans",
+                 "Handwritten", "Slab Serif", "Antique", "Didone",
+                 "Old Style"]
+BODY_FONTS = ["Classical Humanist", "Rounded Sans", "Neo-Grotesque",
+              "Humanist", "Antique", "Transitional"]
+CODE_FONTS = ["Monospace Code", "Monospace Slab Serif"]
 
 # (libellé affiché, valeur)
 RATIOS = [
@@ -56,8 +63,9 @@ SPACING_BASES = [4, 8]
 class Config:
     primary: str = "#3b82f6"
     secondary: str = "#f59e0b"
-    font_heading: str = "System UI"
-    font_body: str = "System UI"
+    font_heading: str = "Geometric Humanist"
+    font_body: str = "Classical Humanist"
+    font_mono: str = "Monospace Code"
     base_size: int = 16          # px — taille du texte courant
     ratio: float = 1.25          # ratio de l'échelle typographique
     spacing_base: int = 4        # px — unité d'espacement

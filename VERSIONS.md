@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.2.0 — Listes de polices dédiées par usage (11 juin 2026)
+
+**Description courte :** sélecteurs de polices distincts pour les titres, le texte et le code, chacun avec sa propre liste de classifications Modern Font Stacks dans un ordre défini.
+
+**Explication commentée :**
+
+- *Police des titres* — Geometric Humanist (défaut), Industrial, Rounded Sans, Handwritten, Slab Serif, Antique, Didone, Old Style.
+- *Police du texte* — Classical Humanist (défaut), Rounded Sans, Neo-Grotesque, Humanist, Antique, Transitional.
+- *Police du code* — nouveau sélecteur : Monospace Code (défaut), Monospace Slab Serif ; le token `--font-mono` du CSS généré suit désormais ce choix au lieu d'être figé.
+- *Réinitialisation* — la police du code fait partie des tokens restaurés par le bouton de réinitialisation ; « System UI » n'étant plus proposé, les défauts sont les premières entrées de chaque liste.
+
+---
+
 ## v1.1.0 — Polices Modern Font Stacks, couleur secondaire, corrections (10 juin 2026)
 
 **Description courte :** sélection des polices selon la classification de modernfontstacks.com (classées sans-serif, serif, monospace), couleur secondaire réellement utilisée dans les pages, correction du champ `select` sombre en thème clair, bouton de réinitialisation des tokens.

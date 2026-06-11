@@ -28,7 +28,8 @@ gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, WebKit  # noqa: E402
 
-from tokens import Config, FONT_STACKS, RATIOS, SPACING_BASES  # noqa: E402
+from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
+                    RATIOS, SPACING_BASES)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
 from pages import PAGES, wrap_preview, wrap_export  # noqa: E402
 
@@ -79,9 +80,10 @@ class ThemoWindow(Adw.ApplicationWindow):
             title="Typographie",
             description="L'échelle complète est calculée automatiquement",
         )
-        fonts = list(FONT_STACKS)
-        grp.add(self._combo_row("Police des titres", fonts, "font_heading"))
-        grp.add(self._combo_row("Police du texte", fonts, "font_body"))
+        grp.add(self._combo_row("Police des titres", HEADING_FONTS,
+                                "font_heading"))
+        grp.add(self._combo_row("Police du texte", BODY_FONTS, "font_body"))
+        grp.add(self._combo_row("Police du code", CODE_FONTS, "font_mono"))
         grp.add(self._spin_row("Taille de base (px)", 12, 24, "base_size"))
         grp.add(self._combo_row(
             "Ratio de l'échelle", [label for label, _ in RATIOS], "ratio",
@@ -207,8 +209,8 @@ class ThemoWindow(Adw.ApplicationWindow):
 
     # Tokens remis à zéro par le bouton — les templates n'en font pas partie
     _TOKEN_ATTRS = ("primary", "secondary", "font_heading", "font_body",
-                    "base_size", "ratio", "spacing_base", "radius",
-                    "shadow_alpha")
+                    "font_mono", "base_size", "ratio", "spacing_base",
+                    "radius", "shadow_alpha")
 
     def _reset_tokens(self, *_args):
         defaults = Config()
