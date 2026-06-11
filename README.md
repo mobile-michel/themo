@@ -64,6 +64,25 @@ Héro pleine largeur : placez une `<section>` directement dans `<body>`, avant `
 - `project.py` — projet sur disque : tokens (INI) + pages HTML
 - `themo.desktop` — lanceur pour le menu d'applications
 
+## Applications comparables
+
+Thémo se situe à l'intersection de quatre familles d'outils, sans appartenir à aucune. Ses différenciateurs : natif Linux, 100 % CSS (pas de JSON), sans classes, et un générateur de tokens couplé à un mini-éditeur de site.
+
+**Générateurs de design tokens** — la catégorie la plus proche, presque entièrement web et centrée JSON (format W3C/DTCG) :
+
+- [Tokens Studio](https://tokens.studio/) — la référence professionnelle (plugin Figma, éditeur nodal) ; sortie JSON d'abord, CSS ensuite.
+- [Utopia](https://utopia.fyi/) — très proche dans l'esprit : peu d'entrées, échelles typographiques et d'espacement calculées, variables CSS pures.
+- [Realtime Colors](https://www.realtimecolors.com/) et [uicolors.app](https://uicolors.app/) — aperçu couleurs/polices sur un vrai site ; gammes 50→900 depuis une couleur, comme les gammes OKLCH de Thémo.
+- [Penpot](https://penpot.app/) — outil de design open source, design tokens natifs au format DTCG avec export CSS.
+
+**Applications Linux natives** — [Gradience](https://github.com/GradienceTeam/Gradience) (GTK4/libadwaita) est le cousin le plus proche en forme : tokens de couleurs, aperçu en direct… mais il thème les applications GTK, pas le web. Le créneau « app de bureau Linux → design système CSS » est quasiment vide.
+
+**Frameworks CSS sans classes** — le CSS généré est de la famille de [Pico.css](https://picocss.com/), [Water.css](https://watercss.kognise.dev/), [MVP.css](https://andybrewer.github.io/mvp/) ou [Simple.css](https://simplecss.org/) : du HTML nu stylé par éléments. Ces frameworks sont figés ou paramétrables à la marge ; Thémo en génère un sur mesure.
+
+**Éditeurs de pages** — l'édition WYSIWYG + source avec aperçu rappelle la lignée BlueGriffon/KompoZer (aujourd'hui à l'abandon) et [Publii](https://getpublii.com/) (CMS de bureau pour sites statiques) — mais aucun n'est piloté par un design système.
+
+L'équivalent fonctionnel le plus direct reste la combinaison web Utopia + uicolors + Realtime Colors — en trois onglets au lieu d'une application.
+
 ## Note Ubuntu
 
 Ubuntu ≥ 24.04 restreint les espaces de noms non privilégiés, ce qui empêche le bac à sable interne de WebKit de démarrer pour les applications sans profil AppArmor. Thémo le détecte et désactive ce bac à sable — sans conséquence ici, l'aperçu ne rendant que du HTML généré localement.
