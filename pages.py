@@ -5,6 +5,17 @@ exportés à côté de design-system.css. Tout le rendu vient des styles
 appliqués aux éléments HTML par la feuille générée.
 """
 
+import re
+import unicodedata
+
+
+def slugify(name):
+    norm = unicodedata.normalize("NFKD", name)
+    ascii_ = norm.encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_.lower()).strip("-")
+    return slug or "page"
+
+
 _SVG_PLACEHOLDER = (
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
     "width='800' height='360'%3E%3Crect width='800' height='360' "
@@ -349,6 +360,66 @@ BLOCKS = {
 """),
     "Séparateur": ("main", "  <hr>\n"),
 }
+
+
+# ---------------------------------------------------------------------------
+# Navigation principale : mise à jour automatique des liens entre pages.
+# Les liens sont identifiés par leur href (slug de la page) ; les liens
+# personnalisés (href="#", liens externes…) ne sont jamais touchés.
+# ---------------------------------------------------------------------------
+
+def _nav_ul_span(body):
+    """Bornes (début, fin) du contenu du premier <ul> de la nav d'en-tête."""
+    m = re.search(r"<header>.*?<nav>.*?<ul>", body, re.S | re.I)
+    if not m:
+        return None
+    end = body.find("</ul>", m.end())
+    return (m.end(), end) if end != -1 else None
+
+
+def nav_add_link(body, name):
+    """Ajoute en fin de nav un lien vers la page `name` (s'il n'y est pas)."""
+    span = _nav_ul_span(body)
+    if span is None:
+        return body
+    start, end = span
+    href = f"{slugify(name)}.html"
+    if f'href="{href}"' in body[start:end]:
+        return body
+    line_start = body.rfind("\n", start, end) + 1
+    li = f'      <li><a href="{href}">{name}</a></li>\n'
+    return body[:line_start] + li + body[line_start:]
+
+
+def nav_remove_link(body, name):
+    """Retire de la nav le lien vers la page `name`."""
+    href = re.escape(f"{slugify(name)}.html")
+    pattern = re.compile(
+        r'[ \t]*<li>\s*<a\b[^>]*href="' + href + r'"[^>]*>.*?</a>\s*</li>[ \t]*\n?',
+        re.S | re.I)
+    return pattern.sub("", body, count=1)
+
+
+def nav_rename_link(body, old, new):
+    """Met à jour libellé et href du lien vers la page renommée."""
+    old_href = re.escape(f"{slugify(old)}.html")
+    new_href = f"{slugify(new)}.html"
+    pattern = re.compile(
+        r'(<a\b[^>]*?href=")' + old_href + r'("[^>]*>).*?(</a>)', re.S | re.I)
+    return pattern.sub(rf"\g<1>{new_href}\g<2>{new}\g<3>", body, count=1)
+
+
+def nav_set_links(body, names, current=None):
+    """Remplace la nav entière par des liens vers `names` (page créée)."""
+    span = _nav_ul_span(body)
+    if span is None:
+        return body
+    start, end = span
+    items = "".join(
+        '      <li><a href="{}.html"{}>{}</a></li>\n'.format(
+            slugify(n), ' aria-current="page"' if n == current else "", n)
+        for n in names)
+    return body[:start] + "\n" + items + "    " + body[end:]
 
 
 def insert_block(body: str, name: str) -> str:

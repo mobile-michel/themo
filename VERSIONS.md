@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.8.0 — Navigation synchronisée et liens fonctionnels dans l'aperçu (11 juin 2026)
+
+**Description courte :** la navigation principale de toutes les pages est tenue à jour automatiquement lors de l'ajout, la duplication, le renommage ou la suppression d'une page, et les liens deviennent fonctionnels dans l'aperçu.
+
+**Explication commentée :**
+
+- *Synchronisation chirurgicale* — chaque lien de page est identifié par son `href` en slug ; quatre fonctions pures dans `pages.py` (`nav_add_link`, `nav_remove_link`, `nav_rename_link`, `nav_set_links`) n'ajoutent, retirent ou renomment que le `<li>` concerné dans la nav d'en-tête de chaque page ; les liens personnalisés (`href="#"`, liens externes) ne sont jamais touchés ; opérations idempotentes, `aria-current` préservé au renommage.
+- *Page créée* — elle reçoit une nav régénérée listant toutes les pages du projet, sa propre entrée marquée `aria-current="page"`.
+- *Liens fonctionnels dans l'aperçu* — l'aperçu étant chargé en mémoire (base `file:///`), les liens internes ne menaient nulle part ; la navigation du WebView est interceptée (`decide-policy`) : lien interne → bascule sur la page du projet (le sélecteur suit, toast si page introuvable) ; lien externe → application par défaut ; ancres et chargements internes inchangés.
+- *Au passage* — `slugify` migre de `project.py` vers `pages.py` (réexporté) pour éviter un import circulaire.
+
+---
+
 ## v1.7.0 — Composition par blocs (11 juin 2026)
 
 **Description courte :** un menu « + » insère dans la page courante des blocs prêts à l'emploi, garantis sans classe CSS et placés automatiquement au bon endroit — dernière phase de l'étude de faisabilité.

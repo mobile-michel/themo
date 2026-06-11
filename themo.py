@@ -34,7 +34,8 @@ from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
 from pages import (MODELS, BLOCKS, insert_block,  # noqa: E402
-                   wrap_preview, wrap_export)
+                   nav_add_link, nav_remove_link, nav_rename_link,
+                   nav_set_links, wrap_preview, wrap_export)
 from project import Project, slugify  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
@@ -220,6 +221,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         self.webview = WebKit.WebView(user_content_manager=ucm)
         self.webview.set_vexpand(True)
         self.webview.connect("load-changed", self._on_load_changed)
+        self.webview.connect("decide-policy", self._on_decide_policy)
 
         self.page_selector = Gtk.DropDown.new_from_strings(
             list(self.project.pages))
@@ -403,6 +405,35 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._set_design_mode(False)
             self._load_page_into_editor()
 
+    def _on_decide_policy(self, _webview, decision, dtype):
+        """Suivre les liens internes dans l'aperçu, sans fichiers réels.
+
+        L'aperçu est chargé en mémoire (base file:///) : un lien
+        « tarifs.html » ne correspond à aucun fichier. On intercepte la
+        navigation : lien interne -> bascule sur la page du projet ;
+        lien externe -> navigateur par défaut ; ancres (#…) inchangées.
+        """
+        if dtype != WebKit.PolicyDecisionType.NAVIGATION_ACTION:
+            return False
+        uri = decision.get_navigation_action().get_request().get_uri()
+        if uri.startswith(("http://", "https://", "mailto:")):
+            decision.ignore()
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+            return True
+        if not (uri.startswith("file://") and uri.endswith(".html")):
+            return False  # base file:///, ancres… : comportement normal
+        decision.ignore()
+        slug = uri.rsplit("/", 1)[-1][:-len(".html")]
+        for name in self.project.pages:
+            if slugify(name) == slug:
+                names = list(self.project.pages)
+                self.page_selector.set_selected(names.index(name))
+                break
+        else:
+            self.toasts.add_toast(Adw.Toast(
+                title=f"Aucune page « {slug}.html » dans le projet"))
+        return True
+
     def _on_load_changed(self, _webview, event):
         # réactiver l'édition après chaque rechargement de l'aperçu
         if (event == WebKit.LoadEvent.FINISHED
@@ -459,14 +490,25 @@ class ThemoWindow(Adw.ApplicationWindow):
                 entry.get_text().strip() or "Nouvelle page")
             model = list(MODELS)[models.get_selected()]
             self.project.pages[name] = MODELS[model]
+            self._sync_navigation_add(name)
             self._touch()
             self._rebuild_page_selector(select=name)
         dialog.choose(self, None, done)
+
+    def _sync_navigation_add(self, name):
+        """Nouvelle page : lien ajouté partout, nav complète sur la page."""
+        for other in self.project.pages:
+            if other != name:
+                self.project.pages[other] = nav_add_link(
+                    self.project.pages[other], name)
+        self.project.pages[name] = nav_set_links(
+            self.project.pages[name], list(self.project.pages), current=name)
 
     def _page_duplicate(self, *_args):
         current = self._current_page_name()
         name = self._unique_page_name(f"{current} (copie)")
         self.project.pages[name] = self.project.pages[current]
+        self._sync_navigation_add(name)
         self._touch()
         self._rebuild_page_selector(select=name)
 
@@ -493,7 +535,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                     title=f"Une page « {new} » existe déjà"))
                 return
             self.project.pages = {
-                (new if k == current else k): v
+                (new if k == current else k): nav_rename_link(v, current, new)
                 for k, v in self.project.pages.items()}
             self._touch()
             self._rebuild_page_selector(select=new)
@@ -529,6 +571,9 @@ class ThemoWindow(Adw.ApplicationWindow):
             if d.choose_finish(result) != "delete":
                 return
             del self.project.pages[current]
+            for other in self.project.pages:
+                self.project.pages[other] = nav_remove_link(
+                    self.project.pages[other], current)
             self._touch()
             self._rebuild_page_selector()
         dialog.choose(self, None, done)

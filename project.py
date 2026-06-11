@@ -11,7 +11,6 @@ la page est porté par la balise <title>.
 """
 
 import re
-import unicodedata
 from dataclasses import fields
 from pathlib import Path
 
@@ -19,17 +18,10 @@ from gi.repository import GLib
 
 from tokens import Config
 from css_gen import generate_css
-from pages import PAGES, wrap_export
+from pages import PAGES, wrap_export, slugify  # noqa: F401 (réexporté)
 
 _BODY_RE = re.compile(r"<body[^>]*>(.*)</body>", re.S | re.I)
 _TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
-
-
-def slugify(name):
-    norm = unicodedata.normalize("NFKD", name)
-    ascii_ = norm.encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_.lower()).strip("-")
-    return slug or "page"
 
 
 class Project:
