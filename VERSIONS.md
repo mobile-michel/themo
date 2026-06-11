@@ -4,6 +4,20 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.5.0 — Projets, édition des pages et pages supplémentaires (11 juin 2026)
+
+**Description courte :** le travail s'organise en projet sur disque (tokens + pages), les pages s'éditent dans un éditeur HTML intégré avec aperçu en direct, et peuvent être ajoutées, dupliquées, renommées et supprimées.
+
+**Explication commentée :**
+
+- *Projet sur disque* — nouveau module `project.py` : un dossier par projet avec `themo.conf` (tokens au format INI via GLib.KeyFile, pas de JSON), `design-system.css` régénéré à chaque enregistrement, et une page HTML complète par page, liée à la feuille et utilisable hors de l'application. Menu ☰ Nouveau / Ouvrir (Ctrl+O) / Enregistrer (Ctrl+S) / Enregistrer sous… ; pastille ● dans la barre latérale en cas de modifications non enregistrées.
+- *Gestion des pages* — ajout (Ctrl+N) depuis un modèle (Page vide, Vitrine, Article, Formulaire), duplication, renommage, suppression avec confirmation ; la dernière page est protégée ; noms de fichiers en slugs Unicode (`<title>` porte le nom de la page).
+- *Éditeur HTML intégré* — GtkSourceView 5 (coloration, numéros de ligne, thème suivant le système) révélé sous l'aperçu par le bouton crayon ; l'aperçu se rafraîchit pendant la frappe ; seul le corps de la page s'édite. Nouvelle dépendance : `gir1.2-gtksource-5`.
+- *Garde-fou* — le nettoyage des pages orphelines à l'enregistrement ne s'applique que dans un dossier déjà reconnu comme projet Thémo, jamais dans un dossier quelconque.
+- *Limite assumée* — pas encore d'avertissement à la fermeture avec des modifications non enregistrées (prévu en suite possible avec l'édition WYSIWYG, phase 2 de l'étude de faisabilité).
+
+---
+
 ## v1.4.0 — Le style graphique devient un préréglage complet (11 juin 2026)
 
 **Description courte :** barre latérale réorganisée — Style graphique en tête, Ambiance des couleurs et mode sombre dans Couleurs — et chaque style graphique prérègle désormais l'ensemble des tokens selon son caractère.

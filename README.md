@@ -28,7 +28,7 @@ Le CSS généré a trois étages :
 python3 themo.py
 ```
 
-Dépendances (présentes sur la plupart des distributions avec GNOME) : `python3-gi`, GTK 4, libadwaita ≥ 1.4, WebKitGTK 6.0 (`gir1.2-webkit-6.0` sous Debian/Ubuntu).
+Dépendances (présentes sur la plupart des distributions avec GNOME) : `python3-gi`, GTK 4, libadwaita ≥ 1.5, WebKitGTK 6.0 et GtkSourceView 5 (`gir1.2-webkit-6.0` et `gir1.2-gtksource-5` sous Debian/Ubuntu).
 
 Pour l'avoir dans le menu d'applications :
 
@@ -40,9 +40,10 @@ cp themo.desktop ~/.local/share/applications/
 
 - Le style graphique, tout en haut, prérègle l'ensemble des tokens selon son caractère (Moderne, Classique, Minimal) ; chaque token reste ensuite ajustable librement, et le bouton de réinitialisation réaligne le tout sur le style courant.
 - La barre latérale modifie les tokens, l'aperçu se met à jour en direct.
-- Le sélecteur en haut change la page de démonstration (Vitrine / Article / Formulaire) ; le bouton lune bascule clair/sombre.
-- **Exporter → Exporter le CSS…** : écrit `design-system.css`.
-- **Exporter → Exporter CSS + pages HTML…** : écrit en plus les trois gabarits HTML (sans classes) liés à la feuille de styles, pour tester ou démarrer un projet.
+- Le sélecteur en haut change la page affichée ; le menu adjacent permet d'**ajouter** (depuis un modèle : page vide, Vitrine, Article, Formulaire), **dupliquer**, **renommer** et **supprimer** des pages. Le bouton lune bascule clair/sombre.
+- Le bouton crayon ouvre l'**éditeur HTML** de la page courante (GtkSourceView, coloration syntaxique) ; l'aperçu se met à jour pendant la frappe. Seul le corps de la page s'édite — et pour rester fidèle au design système, n'utilisez pas d'attribut `class`.
+- Le travail s'organise en **projet** : un dossier contenant `themo.conf` (tokens, format INI), `design-system.css` et une page HTML complète par page du projet — des fichiers ordinaires, utilisables tels quels. Menu ☰ : Nouveau / Ouvrir / Enregistrer (Ctrl+S) / Enregistrer sous… Utilisez un dossier dédié par projet.
+- Menu ☰ → **Exporter le CSS…** : écrit `design-system.css` seul ; **Exporter CSS + pages HTML…** : écrit aussi toutes les pages du projet.
 
 Pour forcer un thème dans vos pages : `<html data-theme="dark">` ou `<html data-theme="light">` ; sans attribut, le thème suit le système.
 
@@ -50,10 +51,11 @@ Héro pleine largeur : placez une `<section>` directement dans `<body>`, avant `
 
 ## Fichiers
 
-- `themo.py` — application GTK4/Adwaita (fenêtre, aperçu WebKit, export)
-- `tokens.py` — calculs des tokens dérivés (OKLCH, échelles)
+- `themo.py` — application GTK4/Adwaita (fenêtre, aperçu WebKit, éditeur, export)
+- `tokens.py` — calculs des tokens dérivés (OKLCH, échelles), préréglages
 - `css_gen.py` — templates sémantiques + éléments, assemblage du CSS
-- `pages.py` — gabarits HTML de démonstration (sans classes)
+- `pages.py` — modèles de pages HTML (sans classes)
+- `project.py` — projet sur disque : tokens (INI) + pages HTML
 - `themo.desktop` — lanceur pour le menu d'applications
 
 ## Note Ubuntu

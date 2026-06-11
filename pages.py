@@ -220,6 +220,29 @@ PAGES = {
 }
 
 
+# Modèles proposés à la création d'une page (les pages de démonstration
+# servent de point de départ, copiées dans le projet).
+BLANK_PAGE = """\
+<header>
+  <nav>
+    <strong>Mon site</strong>
+    <ul>
+      <li><a href="#" aria-current="page">Accueil</a></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <h1>Nouvelle page</h1>
+  <p>Le contenu de cette page est à éditer.</p>
+</main>
+<footer>
+  <p>© 2026</p>
+</footer>
+"""
+
+MODELS = {"Page vide": BLANK_PAGE, **PAGES}
+
+
 def wrap_preview(body: str, css: str, theme: str | None = None) -> str:
     """Page complète avec CSS embarqué, pour l'aperçu WebKit."""
     attr = f' data-theme="{theme}"' if theme else ""

@@ -2,9 +2,9 @@
 """Thémo — générateur de design système CSS pour Linux (GTK4 / libadwaita).
 
 Quelques tokens de base saisis dans la barre latérale, tout le reste est
-dérivé automatiquement ; aperçu en direct via WebKitGTK ; export d'un
-fichier design-system.css (et de pages HTML de démonstration), sans la
-moindre classe CSS.
+dérivé automatiquement ; aperçu en direct via WebKitGTK ; pages éditables
+(GtkSourceView) et organisées en projet sur disque ; export d'un fichier
+design-system.css et de pages HTML, sans la moindre classe CSS.
 """
 
 import os
@@ -26,12 +26,14 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, WebKit  # noqa: E402
+gi.require_version("GtkSource", "5")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GtkSource, WebKit  # noqa: E402
 
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
-from pages import PAGES, wrap_preview, wrap_export  # noqa: E402
+from pages import MODELS, wrap_preview, wrap_export  # noqa: E402
+from project import Project, slugify  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
 
@@ -46,12 +48,15 @@ class ThemoWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.cfg = Config()
+        self.project = Project()
+        self.cfg = self.project.cfg
         self._refresh_id = 0
-        self._setters = {}  # attr -> fn(valeur) pour réaligner les widgets
+        self._setters = {}   # attr -> fn(valeur) pour réaligner les widgets
+        self._loading = False    # vrai pendant la synchronisation des widgets
+        self._buffer_lock = False  # vrai pendant le chargement de l'éditeur
+        self._dirty = False
 
-        self.set_title("Thémo")
-        self.set_default_size(1280, 860)
+        self.set_default_size(1280, 900)
 
         split = Adw.OverlaySplitView()
         split.set_min_sidebar_width(330)
@@ -64,6 +69,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         self.set_content(self.toasts)
 
         self._install_actions()
+        self._update_title()
+        self._load_page_into_editor()
         self._refresh()
 
     # -- Barre latérale : les tokens de base --------------------------------
@@ -76,7 +83,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             description="Prérègle tous les tokens selon son caractère",
         )
         row = self._combo_row("Style", list(ELEMENT_TEMPLATES),
-                              "element_template", tracked=False)
+                              "element_template")
         row.set_subtitle("Styles des balises HTML")
         grp.add(row)
         page.add(grp)
@@ -91,6 +98,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         dark = Adw.SwitchRow(title="Inclure le mode sombre")
         dark.set_active(self.cfg.include_dark)
         dark.connect("notify::active", self._on_switch, "include_dark")
+        self._setters["include_dark"] = dark.set_active
         grp.add(dark)
         page.add(grp)
 
@@ -131,8 +139,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         page.add(grp)
 
         header = Adw.HeaderBar()
-        header.set_title_widget(Adw.WindowTitle(
-            title="Thémo", subtitle="Design système → CSS"))
+        self.win_title = Adw.WindowTitle(title="Thémo")
+        header.set_title_widget(self.win_title)
         reset = Gtk.Button(
             icon_name="edit-undo-symbolic",
             tooltip_text="Réaligner les tokens sur le style graphique courant")
@@ -162,8 +170,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         row.set_activatable_widget(btn)
         return row
 
-    def _combo_row(self, title, labels, attr, values=None, default_index=0,
-                   tracked=True):
+    def _combo_row(self, title, labels, attr, values=None, default_index=0):
         row = Adw.ComboRow(title=title)
         row.set_model(Gtk.StringList.new(labels))
         current = getattr(self.cfg, attr)
@@ -171,8 +178,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         index = options.index(current) if current in options else default_index
         row.set_selected(index)
         row.connect("notify::selected", self._on_combo, attr, options)
-        if tracked:
-            self._setters[attr] = lambda v: row.set_selected(options.index(v))
+        self._setters[attr] = lambda v: row.set_selected(options.index(v))
         return row
 
     def _spin_row(self, title, lo, hi, attr, step=1, digits=0):
@@ -184,52 +190,269 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._setters[attr] = row.set_value
         return row
 
-    # -- Zone d'aperçu -------------------------------------------------------
+    # -- Zone d'aperçu et éditeur ----------------------------------------------
 
     def _build_content(self):
         self.webview = WebKit.WebView()
+        self.webview.set_vexpand(True)
 
-        self.page_selector = Gtk.DropDown.new_from_strings(list(PAGES))
-        self.page_selector.connect("notify::selected",
-                                   lambda *a: self._schedule_refresh())
+        self.page_selector = Gtk.DropDown.new_from_strings(
+            list(self.project.pages))
+        self.page_selector.connect("notify::selected", self._on_page_selected)
+
+        pages_menu = Gio.Menu()
+        pages_menu.append("Ajouter une page…", "win.page-add")
+        pages_menu.append("Dupliquer la page", "win.page-duplicate")
+        pages_menu.append("Renommer la page…", "win.page-rename")
+        pages_menu.append("Supprimer la page…", "win.page-delete")
+        pages_btn = Gtk.MenuButton(icon_name="view-more-symbolic",
+                                   menu_model=pages_menu,
+                                   tooltip_text="Gérer les pages")
+        title_box = Gtk.Box(spacing=6)
+        title_box.append(self.page_selector)
+        title_box.append(pages_btn)
 
         self.dark_toggle = Gtk.ToggleButton(
             icon_name="weather-clear-night-symbolic",
             tooltip_text="Prévisualiser le thème sombre")
         self.dark_toggle.connect("toggled", lambda *a: self._schedule_refresh())
 
-        menu = Gio.Menu()
-        menu.append("Exporter le CSS…", "win.export-css")
-        menu.append("Exporter CSS + pages HTML…", "win.export-all")
-        export = Gtk.MenuButton(label="Exporter", menu_model=menu)
+        self.editor_toggle = Gtk.ToggleButton(
+            icon_name="document-edit-symbolic",
+            tooltip_text="Afficher l'éditeur HTML de la page")
+        self.editor_toggle.connect("toggled", self._on_editor_toggled)
+
+        project_menu = Gio.Menu()
+        sect = Gio.Menu()
+        sect.append("Nouveau projet", "win.project-new")
+        sect.append("Ouvrir un projet…", "win.project-open")
+        sect.append("Enregistrer", "win.project-save")
+        sect.append("Enregistrer sous…", "win.project-save-as")
+        project_menu.append_section("Projet", sect)
+        sect = Gio.Menu()
+        sect.append("Exporter le CSS…", "win.export-css")
+        sect.append("Exporter CSS + pages HTML…", "win.export-all")
+        project_menu.append_section("Export", sect)
+        burger = Gtk.MenuButton(icon_name="open-menu-symbolic",
+                                menu_model=project_menu,
+                                tooltip_text="Projet et export")
+
+        export = Gtk.Button(label="Enregistrer")
         export.add_css_class("suggested-action")
+        export.connect("clicked",
+                       lambda *a: self.activate_action("win.project-save"))
 
         header = Adw.HeaderBar()
-        header.set_title_widget(self.page_selector)
+        header.set_title_widget(title_box)
         header.pack_start(self.dark_toggle)
+        header.pack_start(self.editor_toggle)
+        header.pack_end(burger)
         header.pack_end(export)
+
+        # éditeur HTML de la page courante
+        GtkSource.init()
+        self.src_buffer = GtkSource.Buffer()
+        lang = GtkSource.LanguageManager.get_default().get_language("html")
+        if lang:
+            self.src_buffer.set_language(lang)
+        self._update_editor_scheme()
+        Adw.StyleManager.get_default().connect(
+            "notify::dark", self._update_editor_scheme)
+        self.src_buffer.connect("changed", self._on_editor_changed)
+
+        src_view = GtkSource.View(buffer=self.src_buffer)
+        src_view.set_monospace(True)
+        src_view.set_show_line_numbers(True)
+        src_view.set_tab_width(2)
+        src_view.set_insert_spaces_instead_of_tabs(True)
+        src_view.set_top_margin(6)
+        src_view.set_left_margin(6)
+
+        scroller = Gtk.ScrolledWindow(child=src_view)
+        scroller.set_min_content_height(300)
+        self.editor_revealer = Gtk.Revealer(child=scroller)
+        self.editor_revealer.set_transition_type(
+            Gtk.RevealerTransitionType.SLIDE_UP)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.append(self.webview)
+        box.append(self.editor_revealer)
 
         view = Adw.ToolbarView()
         view.add_top_bar(header)
-        view.set_content(self.webview)
+        view.set_content(box)
         return view
+
+    def _update_editor_scheme(self, *_args):
+        dark = Adw.StyleManager.get_default().get_dark()
+        scheme = GtkSource.StyleSchemeManager.get_default().get_scheme(
+            "Adwaita-dark" if dark else "Adwaita")
+        if scheme:
+            self.src_buffer.set_style_scheme(scheme)
+
+    # -- Pages -------------------------------------------------------------------
+
+    def _current_page_name(self):
+        names = list(self.project.pages)
+        idx = self.page_selector.get_selected()
+        return names[idx] if 0 <= idx < len(names) else names[0]
+
+    def _rebuild_page_selector(self, select=None):
+        names = list(self.project.pages)
+        self._loading = True
+        self.page_selector.set_model(Gtk.StringList.new(names))
+        self.page_selector.set_selected(
+            names.index(select) if select in names else 0)
+        self._loading = False
+        self._load_page_into_editor()
+        self._schedule_refresh()
+
+    def _on_page_selected(self, *_args):
+        if self._loading:
+            return
+        self._load_page_into_editor()
+        self._schedule_refresh()
+
+    def _load_page_into_editor(self):
+        self._buffer_lock = True
+        self.src_buffer.set_text(
+            self.project.pages.get(self._current_page_name(), ""))
+        self._buffer_lock = False
+
+    def _on_editor_toggled(self, btn):
+        self.editor_revealer.set_reveal_child(btn.get_active())
+
+    def _on_editor_changed(self, buffer):
+        if self._buffer_lock:
+            return
+        text = buffer.get_text(buffer.get_start_iter(),
+                               buffer.get_end_iter(), True)
+        self.project.pages[self._current_page_name()] = text
+        self._touch()
+        self._schedule_refresh()
+
+    def _unique_page_name(self, wanted):
+        name, n = wanted, 2
+        while name in self.project.pages:
+            name = f"{wanted} ({n})"
+            n += 1
+        return name
+
+    def _page_add(self, *_args):
+        entry = Gtk.Entry(placeholder_text="Nom de la page",
+                          activates_default=True)
+        models = Gtk.DropDown.new_from_strings(list(MODELS))
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.append(entry)
+        box.append(models)
+        dialog = Adw.AlertDialog(heading="Ajouter une page",
+                                 body="Nom et modèle de départ :")
+        dialog.set_extra_child(box)
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("add", "Ajouter")
+        dialog.set_response_appearance("add", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("add")
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            if d.choose_finish(result) != "add":
+                return
+            name = self._unique_page_name(
+                entry.get_text().strip() or "Nouvelle page")
+            model = list(MODELS)[models.get_selected()]
+            self.project.pages[name] = MODELS[model]
+            self._touch()
+            self._rebuild_page_selector(select=name)
+        dialog.choose(self, None, done)
+
+    def _page_duplicate(self, *_args):
+        current = self._current_page_name()
+        name = self._unique_page_name(f"{current} (copie)")
+        self.project.pages[name] = self.project.pages[current]
+        self._touch()
+        self._rebuild_page_selector(select=name)
+
+    def _page_rename(self, *_args):
+        current = self._current_page_name()
+        entry = Gtk.Entry(text=current, activates_default=True)
+        dialog = Adw.AlertDialog(heading="Renommer la page")
+        dialog.set_extra_child(entry)
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("rename", "Renommer")
+        dialog.set_response_appearance("rename",
+                                       Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("rename")
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            if d.choose_finish(result) != "rename":
+                return
+            new = entry.get_text().strip()
+            if not new or new == current:
+                return
+            if new in self.project.pages:
+                self.toasts.add_toast(Adw.Toast(
+                    title=f"Une page « {new} » existe déjà"))
+                return
+            self.project.pages = {
+                (new if k == current else k): v
+                for k, v in self.project.pages.items()}
+            self._touch()
+            self._rebuild_page_selector(select=new)
+        dialog.choose(self, None, done)
+
+    def _page_delete(self, *_args):
+        current = self._current_page_name()
+        if len(self.project.pages) == 1:
+            self.toasts.add_toast(Adw.Toast(
+                title="Impossible de supprimer la dernière page"))
+            return
+        dialog = Adw.AlertDialog(
+            heading=f"Supprimer « {current} » ?",
+            body="La page sera retirée du projet au prochain enregistrement.")
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("delete", "Supprimer")
+        dialog.set_response_appearance("delete",
+                                       Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            if d.choose_finish(result) != "delete":
+                return
+            del self.project.pages[current]
+            self._touch()
+            self._rebuild_page_selector()
+        dialog.choose(self, None, done)
 
     # -- Réactions aux changements -------------------------------------------
 
+    def _touch(self):
+        if not self._loading:
+            self._dirty = True
+            self._update_title()
+
     def _on_color(self, btn, _pspec, attr):
         setattr(self.cfg, attr, _rgba_to_hex(btn.get_rgba()))
+        self._touch()
         self._schedule_refresh()
 
     def _on_combo(self, row, _pspec, attr, options):
         setattr(self.cfg, attr, options[row.get_selected()])
-        if attr == "element_template":
+        if attr == "element_template" and not self._loading:
             self._apply_preset(self.cfg.element_template)
+        self._touch()
         self._schedule_refresh()
 
     def _on_spin(self, row, _pspec, attr):
         value = row.get_value()
         setattr(self.cfg, attr,
                 round(value, 2) if row.get_digits() else int(value))
+        self._touch()
+        self._schedule_refresh()
+
+    def _on_switch(self, row, _pspec, attr):
+        setattr(self.cfg, attr, row.get_active())
+        self._touch()
         self._schedule_refresh()
 
     def _apply_preset(self, style):
@@ -237,16 +460,13 @@ class ThemoWindow(Adw.ApplicationWindow):
         for attr, value in STYLE_PRESETS[style].items():
             setattr(self.cfg, attr, value)
             self._setters[attr](value)
+        self._touch()
         self._schedule_refresh()
         self.toasts.add_toast(Adw.Toast(
             title=f"Tokens alignés sur le style « {style} »"))
 
     def _reset_tokens(self, *_args):
         self._apply_preset(self.cfg.element_template)
-
-    def _on_switch(self, row, _pspec, attr):
-        setattr(self.cfg, attr, row.get_active())
-        self._schedule_refresh()
 
     def _schedule_refresh(self):
         if self._refresh_id:
@@ -256,20 +476,94 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _refresh(self):
         self._refresh_id = 0
         css = generate_css(self.cfg)
-        page_name = list(PAGES)[self.page_selector.get_selected()] \
-            if hasattr(self, "page_selector") else next(iter(PAGES))
+        body = self.project.pages.get(self._current_page_name(), "")
         # Thème forcé dans l'aperçu pour rester indépendant du thème système
-        theme = "dark" if (hasattr(self, "dark_toggle")
-                           and self.dark_toggle.get_active()) else "light"
-        self.webview.load_html(wrap_preview(PAGES[page_name], css, theme),
-                               "file:///")
+        theme = "dark" if self.dark_toggle.get_active() else "light"
+        self.webview.load_html(wrap_preview(body, css, theme), "file:///")
         return GLib.SOURCE_REMOVE
+
+    # -- Projet ------------------------------------------------------------------
+
+    def _update_title(self):
+        star = "● " if self._dirty else ""
+        self.win_title.set_subtitle(f"{star}{self.project.name}")
+        self.set_title(f"Thémo — {self.project.name}")
+
+    def _adopt_project(self, project):
+        self.project = project
+        self.cfg = project.cfg
+        self._loading = True
+        for attr, setter in self._setters.items():
+            setter(getattr(self.cfg, attr))
+        self._loading = False
+        self._dirty = False
+        self._rebuild_page_selector()
+        self._update_title()
+
+    def _project_new(self, *_args):
+        self._adopt_project(Project())
+        self.toasts.add_toast(Adw.Toast(title="Nouveau projet"))
+
+    def _project_open(self, *_args):
+        dialog = Gtk.FileDialog(title="Ouvrir un dossier de projet Thémo")
+        dialog.select_folder(self, None, self._project_open_done)
+
+    def _project_open_done(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result).get_path()
+        except GLib.Error:
+            return
+        try:
+            project = Project.load(folder)
+        except (FileNotFoundError, GLib.Error, OSError) as exc:
+            self.toasts.add_toast(Adw.Toast(title=str(exc)))
+            return
+        self._adopt_project(project)
+        self.toasts.add_toast(Adw.Toast(
+            title=f"Projet « {project.name} » ouvert"))
+
+    def _project_save(self, *_args):
+        if self.project.path is None:
+            self._project_save_as()
+            return
+        self._do_save()
+
+    def _project_save_as(self, *_args):
+        dialog = Gtk.FileDialog(title="Choisir le dossier du projet")
+        dialog.select_folder(self, None, self._project_save_as_done)
+
+    def _project_save_as_done(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result).get_path()
+        except GLib.Error:
+            return
+        self._do_save(folder)
+
+    def _do_save(self, path=None):
+        try:
+            self.project.save(path)
+        except OSError as exc:
+            self.toasts.add_toast(Adw.Toast(
+                title=f"Échec de l'enregistrement : {exc}"))
+            return
+        self._dirty = False
+        self._update_title()
+        self.toasts.add_toast(Adw.Toast(
+            title=f"Projet enregistré dans {self.project.path.name}/"))
 
     # -- Export ----------------------------------------------------------------
 
     def _install_actions(self):
         for name, cb in (("export-css", self._export_css),
-                         ("export-all", self._export_all)):
+                         ("export-all", self._export_all),
+                         ("project-new", self._project_new),
+                         ("project-open", self._project_open),
+                         ("project-save", self._project_save),
+                         ("project-save-as", self._project_save_as),
+                         ("page-add", self._page_add),
+                         ("page-duplicate", self._page_duplicate),
+                         ("page-rename", self._page_rename),
+                         ("page-delete", self._page_delete)):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
             self.add_action(action)
@@ -299,14 +593,12 @@ class ThemoWindow(Adw.ApplicationWindow):
             return
         (folder / "design-system.css").write_text(
             generate_css(self.cfg), encoding="utf-8")
-        for name, body in PAGES.items():
-            slug = (name.lower()
-                    .replace("é", "e").replace("è", "e").replace(" ", "-"))
-            (folder / f"{slug}.html").write_text(
+        for name, body in self.project.pages.items():
+            (folder / f"{slugify(name)}.html").write_text(
                 wrap_export(body, name), encoding="utf-8")
         self.toasts.add_toast(Adw.Toast(
-            title=f"CSS et {len(PAGES)} pages HTML exportés dans "
-                  f"{folder.name}/"))
+            title=f"CSS et {len(self.project.pages)} pages HTML exportés "
+                  f"dans {folder.name}/"))
 
 
 class ThemoApp(Adw.Application):
@@ -314,6 +606,9 @@ class ThemoApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id=APP_ID,
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        self.set_accels_for_action("win.project-save", ["<Control>s"])
+        self.set_accels_for_action("win.project-open", ["<Control>o"])
+        self.set_accels_for_action("win.page-add", ["<Control>n"])
 
     def do_activate(self):
         win = self.get_active_window() or ThemoWindow(application=self)
