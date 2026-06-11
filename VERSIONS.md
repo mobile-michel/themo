@@ -4,6 +4,20 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.6.0 — Édition WYSIWYG du texte dans l'aperçu (11 juin 2026)
+
+**Description courte :** l'aperçu devient directement éditable au clic (designMode), avec synchronisation au fil de la frappe et mise à jour des tokens sans rechargement de la page.
+
+**Explication commentée :**
+
+- *Mode édition* — un bouton bascule (curseur de sélection) rend la page éditable comme un traitement de texte ; un liseré pointillé couleur d'accent signale le mode, porté par les attributs de `<body>` donc jamais enregistré.
+- *Synchronisation événementielle* — un script injecté (UserContentManager) renvoie le `<body>` modifié à l'application à chaque frappe (débounce 200 ms via postMessage) ; le projet est à jour en permanence, la pastille ● s'allume dès la première retouche.
+- *Pas de rechargement pendant l'édition* — les changements de tokens mettent à jour le `<style>` et le thème par JavaScript sans recharger la page : saisie et position du curseur préservées ; le mode se réactive automatiquement après un changement de page.
+- *Garde-fous* — édition WYSIWYG et éditeur HTML source exclusifs (une seule source de vérité, resynchronisation en sortie de mode) ; les modifications ciblent la page réellement rendue et non la sélection courante (condition de course éliminée).
+- *Limite documentée* — WebKit normalise le balisage de la page éditée : l'indentation d'origine est perdue à la première retouche WYSIWYG ; le mode est réservé au texte, la structure passe par l'éditeur HTML.
+
+---
+
 ## v1.5.0 — Projets, édition des pages et pages supplémentaires (11 juin 2026)
 
 **Description courte :** le travail s'organise en projet sur disque (tokens + pages), les pages s'éditent dans un éditeur HTML intégré avec aperçu en direct, et peuvent être ajoutées, dupliquées, renommées et supprimées.

@@ -7,6 +7,7 @@ dérivé automatiquement ; aperçu en direct via WebKitGTK ; pages éditables
 design-system.css et de pages HTML, sans la moindre classe CSS.
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -55,6 +56,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._loading = False    # vrai pendant la synchronisation des widgets
         self._buffer_lock = False  # vrai pendant le chargement de l'éditeur
         self._dirty = False
+        self._loaded_page = None  # page actuellement rendue dans l'aperçu
 
         self.set_default_size(1280, 900)
 
@@ -193,8 +195,30 @@ class ThemoWindow(Adw.ApplicationWindow):
     # -- Zone d'aperçu et éditeur ----------------------------------------------
 
     def _build_content(self):
-        self.webview = WebKit.WebView()
+        # À chaque modification du contenu (mode édition), la page renvoie
+        # son <body> à l'application — synchronisation événementielle.
+        ucm = WebKit.UserContentManager()
+        ucm.register_script_message_handler("edited", None)
+        ucm.connect("script-message-received::edited", self._on_wysiwyg_edit)
+        sync_js = """
+        (function () {
+          let t = null;
+          document.addEventListener('input', function () {
+            clearTimeout(t);
+            t = setTimeout(function () {
+              window.webkit.messageHandlers.edited.postMessage(
+                document.body.innerHTML);
+            }, 200);
+          });
+        })();
+        """
+        ucm.add_script(WebKit.UserScript.new(
+            sync_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
+            WebKit.UserScriptInjectionTime.END, None, None))
+
+        self.webview = WebKit.WebView(user_content_manager=ucm)
         self.webview.set_vexpand(True)
+        self.webview.connect("load-changed", self._on_load_changed)
 
         self.page_selector = Gtk.DropDown.new_from_strings(
             list(self.project.pages))
@@ -222,6 +246,11 @@ class ThemoWindow(Adw.ApplicationWindow):
             tooltip_text="Afficher l'éditeur HTML de la page")
         self.editor_toggle.connect("toggled", self._on_editor_toggled)
 
+        self.wysiwyg_toggle = Gtk.ToggleButton(
+            icon_name="edit-select-text-symbolic",
+            tooltip_text="Éditer le texte directement dans l'aperçu")
+        self.wysiwyg_toggle.connect("toggled", self._on_wysiwyg_toggled)
+
         project_menu = Gio.Menu()
         sect = Gio.Menu()
         sect.append("Nouveau projet", "win.project-new")
@@ -245,6 +274,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.set_title_widget(title_box)
         header.pack_start(self.dark_toggle)
+        header.pack_start(self.wysiwyg_toggle)
         header.pack_start(self.editor_toggle)
         header.pack_end(burger)
         header.pack_end(export)
@@ -320,7 +350,58 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._buffer_lock = False
 
     def _on_editor_toggled(self, btn):
+        # exclusif avec l'édition dans l'aperçu : une seule source de vérité
+        if btn.get_active() and self.wysiwyg_toggle.get_active():
+            self.wysiwyg_toggle.set_active(False)
+        if btn.get_active():
+            self._load_page_into_editor()
         self.editor_revealer.set_reveal_child(btn.get_active())
+
+    # -- Édition WYSIWYG dans l'aperçu ---------------------------------------
+
+    def _run_js(self, code):
+        self.webview.evaluate_javascript(code, -1, None, None, None,
+                                         None, None)
+
+    def _set_design_mode(self, active):
+        if active:
+            self._run_js(
+                "document.designMode = 'on';"
+                "document.body.style.outline = '3px dashed var(--accent)';"
+                "document.body.style.outlineOffset = '-3px';")
+        else:
+            self._run_js(
+                "document.designMode = 'off';"
+                "document.body.style.outline = '';"
+                "document.body.style.outlineOffset = '';")
+
+    def _on_wysiwyg_toggled(self, btn):
+        if btn.get_active():
+            if self.editor_toggle.get_active():
+                self.editor_toggle.set_active(False)
+            self._set_design_mode(True)
+            self.toasts.add_toast(Adw.Toast(
+                title="Édition du texte activée — cliquez dans l'aperçu"))
+        else:
+            self._set_design_mode(False)
+            self._load_page_into_editor()
+
+    def _on_load_changed(self, _webview, event):
+        # réactiver l'édition après chaque rechargement de l'aperçu
+        if (event == WebKit.LoadEvent.FINISHED
+                and self.wysiwyg_toggle.get_active()):
+            self._set_design_mode(True)
+
+    def _on_wysiwyg_edit(self, _ucm, value):
+        # cible : la page rendue dans l'aperçu (et non la sélection courante,
+        # qui peut déjà avoir changé quand le message arrive)
+        if self._loaded_page not in self.project.pages:
+            return
+        html = value.to_string()
+        if not html.endswith("\n"):
+            html += "\n"
+        self.project.pages[self._loaded_page] = html
+        self._touch()
 
     def _on_editor_changed(self, buffer):
         if self._buffer_lock:
@@ -476,10 +557,19 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _refresh(self):
         self._refresh_id = 0
         css = generate_css(self.cfg)
-        body = self.project.pages.get(self._current_page_name(), "")
+        name = self._current_page_name()
         # Thème forcé dans l'aperçu pour rester indépendant du thème système
         theme = "dark" if self.dark_toggle.get_active() else "light"
-        self.webview.load_html(wrap_preview(body, css, theme), "file:///")
+        if self.wysiwyg_toggle.get_active() and self._loaded_page == name:
+            # édition en cours : mettre à jour styles et thème par JS,
+            # sans recharger, pour ne pas perdre la saisie
+            self._run_js(
+                f"document.querySelector('style').textContent = {json.dumps(css)};"
+                f"document.documentElement.setAttribute('data-theme', {json.dumps(theme)});")
+        else:
+            body = self.project.pages.get(name, "")
+            self.webview.load_html(wrap_preview(body, css, theme), "file:///")
+            self._loaded_page = name
         return GLib.SOURCE_REMOVE
 
     # -- Projet ------------------------------------------------------------------
