@@ -4,6 +4,21 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.3.0 — Mise en page, navigation et couleur secondaire (11 juin 2026)
+
+**Description courte :** nouveau groupe de réglages « Mise en page » avec héro pleine largeur, unité d'espacement plus fine, libellés de templates clarifiés, navigation principale stylée et couleur secondaire réaffectée aux citations et à la sélection.
+
+**Explication commentée :**
+
+- *Groupe « Mise en page »* — largeur du contenu (Étroit 40 rem / Moyen 56 rem / Large 72 rem / Pleine largeur, token `--container`), densité verticale (Compact / Normal / Aéré, token `--density`, limité au rythme macro pour ne pas doubler l'unité d'espacement qui règle le micro), largeur minimale des cartes (token `--card-min`). La hauteur de ligne (`--leading-normal`, 1,3 → 2,0) est placée dans le groupe Typographie.
+- *Héro pleine largeur* — une `<section>` placée directement dans `<body>` avant `<main>` devient une bande full-bleed dont le contenu reste aligné sur le conteneur grâce au token calculé `--gutter`, partagé avec l'en-tête et le pied de page ; la page Vitrine l'utilise.
+- *Unité d'espacement* — réglage fin de 2 à 12 px par pas de 0,5 (au lieu du choix 4/8 px).
+- *Templates renommés* — « Sémantique » devient « Ambiance des couleurs » et « Éléments HTML » devient « Style graphique », avec sous-titres techniques ; l'en-tête du CSS exporté reprend ces termes.
+- *Navigation principale* — liens de nav distincts des liens de contenu (couleur atténuée, graisse 500, sans soulignement, transition au survol), page courante signalée par `aria-current="page"` ; déclinaisons par style : pastille (Moderne), barre d'accent (Classique), soulignement décalé (Minimal).
+- *Couleur secondaire* — retirée de `<mark>` (qui revient au ton primaire doux) ; elle colore désormais les citations (`blockquote`, bordure et fond teinté) et la sélection de texte (`::selection`). Tokens `--highlight`/`--highlight-text` remplacés par `--accent-2`/`--accent-2-soft`, déclinés dans les trois ambiances en clair et en sombre.
+
+---
+
 ## v1.2.0 — Listes de polices dédiées par usage (11 juin 2026)
 
 **Description courte :** sélecteurs de polices distincts pour les titres, le texte et le code, chacun avec sa propre liste de classifications Modern Font Stacks dans un ordre défini.

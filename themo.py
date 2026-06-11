@@ -29,7 +29,7 @@ gi.require_version("WebKit", "6.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, WebKit  # noqa: E402
 
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
-                    RATIOS, SPACING_BASES)
+                    RATIOS, CONTAINERS, DENSITIES)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
 from pages import PAGES, wrap_preview, wrap_export  # noqa: E402
 
@@ -88,26 +88,44 @@ class ThemoWindow(Adw.ApplicationWindow):
         grp.add(self._combo_row(
             "Ratio de l'échelle", [label for label, _ in RATIOS], "ratio",
             values=[v for _, v in RATIOS], default_index=2))
+        grp.add(self._spin_row("Hauteur de ligne", 1.3, 2.0, "leading",
+                               step=0.05, digits=2))
         page.add(grp)
 
         grp = Adw.PreferencesGroup(title="Espacements et formes")
-        grp.add(self._combo_row(
-            "Unité d'espacement", [f"{b} px" for b in SPACING_BASES],
-            "spacing_base", values=SPACING_BASES))
+        grp.add(self._spin_row("Unité d'espacement (px)", 2, 12,
+                               "spacing_base", step=0.5, digits=1))
         grp.add(self._spin_row("Rayon de bordure (px)", 0, 32, "radius"))
         grp.add(self._spin_row("Opacité des ombres (%)", 0, 60, "shadow_alpha"))
         page.add(grp)
 
         grp = Adw.PreferencesGroup(
-            title="Templates",
-            description="Tokens sémantiques et styles des éléments HTML",
+            title="Mise en page",
+            description="Rythme macro de la page — l'unité d'espacement"
+                        " règle, elle, l'intérieur des composants",
         )
-        grp.add(self._combo_row(
-            "Sémantique", list(SEMANTIC_TEMPLATES), "semantic_template",
-            resettable=False))
-        grp.add(self._combo_row(
-            "Éléments HTML", list(ELEMENT_TEMPLATES), "element_template",
-            resettable=False))
+        grp.add(self._combo_row("Largeur du contenu", list(CONTAINERS),
+                                "container"))
+        grp.add(self._combo_row("Densité verticale", list(DENSITIES),
+                                "density"))
+        grp.add(self._spin_row("Largeur min. des cartes (rem)", 10, 24,
+                               "card_min"))
+        page.add(grp)
+
+        grp = Adw.PreferencesGroup(
+            title="Templates",
+            description="Application des couleurs et dessin des éléments",
+        )
+        row = self._combo_row(
+            "Ambiance des couleurs", list(SEMANTIC_TEMPLATES),
+            "semantic_template", resettable=False)
+        row.set_subtitle("Tokens sémantiques")
+        grp.add(row)
+        row = self._combo_row(
+            "Style graphique", list(ELEMENT_TEMPLATES),
+            "element_template", resettable=False)
+        row.set_subtitle("Styles des balises HTML")
+        grp.add(row)
         dark = Adw.SwitchRow(title="Inclure le mode sombre")
         dark.set_active(self.cfg.include_dark)
         dark.connect("notify::active", self._on_switch, "include_dark")
@@ -154,8 +172,9 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._resets.append(lambda: row.set_selected(index))
         return row
 
-    def _spin_row(self, title, lo, hi, attr):
-        row = Adw.SpinRow.new_with_range(lo, hi, 1)
+    def _spin_row(self, title, lo, hi, attr, step=1, digits=0):
+        row = Adw.SpinRow.new_with_range(lo, hi, step)
+        row.set_digits(digits)
         row.set_title(title)
         default = getattr(self.cfg, attr)
         row.set_value(default)
@@ -204,13 +223,16 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._schedule_refresh()
 
     def _on_spin(self, row, _pspec, attr):
-        setattr(self.cfg, attr, int(row.get_value()))
+        value = row.get_value()
+        setattr(self.cfg, attr,
+                round(value, 2) if row.get_digits() else int(value))
         self._schedule_refresh()
 
     # Tokens remis à zéro par le bouton — les templates n'en font pas partie
     _TOKEN_ATTRS = ("primary", "secondary", "font_heading", "font_body",
-                    "font_mono", "base_size", "ratio", "spacing_base",
-                    "radius", "shadow_alpha")
+                    "font_mono", "base_size", "ratio", "leading",
+                    "spacing_base", "radius", "shadow_alpha",
+                    "container", "density", "card_min")
 
     def _reset_tokens(self, *_args):
         defaults = Config()

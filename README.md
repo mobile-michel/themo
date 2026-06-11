@@ -12,7 +12,7 @@ Tout le reste est **calculé automatiquement** :
 |---|---|
 | Couleur primaire / secondaire | Gammes 50→900 (espace OKLCH, gamut sRGB respecté) + gamme neutre teintée |
 | Taille de base + ratio | Échelle typographique complète (`--text-xs` → `--text-4xl`) |
-| Unité d'espacement (4/8 px) | Échelle `--space-1` → `--space-24`, conteneurs |
+| Unité d'espacement (2 à 12 px, pas de 0,5) | Échelle `--space-1` → `--space-24`, conteneurs |
 | Rayon de bordure | `--radius-sm/md/lg/xl/full` |
 | Opacité des ombres | 5 niveaux d'élévation `--shadow-1` → `--shadow-5` |
 
@@ -44,6 +44,8 @@ cp themo.desktop ~/.local/share/applications/
 - **Exporter → Exporter CSS + pages HTML…** : écrit en plus les trois gabarits HTML (sans classes) liés à la feuille de styles, pour tester ou démarrer un projet.
 
 Pour forcer un thème dans vos pages : `<html data-theme="dark">` ou `<html data-theme="light">` ; sans attribut, le thème suit le système.
+
+Héro pleine largeur : placez une `<section>` directement dans `<body>`, avant `<main>` — son fond s'étend sur toute la largeur et son contenu reste aligné sur le conteneur (token `--gutter`). Le groupe « Mise en page » règle le rythme **macro** (largeur du contenu, espacement entre sections, grille de cartes), tandis que l'unité d'espacement règle le **micro** (intérieur des composants).
 
 ## Fichiers
 

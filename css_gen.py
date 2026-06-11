@@ -10,7 +10,7 @@ Trois étages, sans aucune classe CSS :
 from datetime import date
 
 from tokens import (
-    Config, FONT_STACKS,
+    Config, FONT_STACKS, CONTAINERS, DENSITIES,
     color_scale, type_scale, spacing_scale, radius_scale, shadow_scale,
 )
 
@@ -22,7 +22,7 @@ from tokens import (
 def _sem(background, surface, text, muted, border, border_strong,
          accent, accent_hover, accent_soft, on_accent,
          link, link_hover, focus, code_bg, selection,
-         highlight, highlight_text):
+         accent_2, accent_2_soft):
     return {
         "background": background, "surface": surface,
         "text": text, "text-muted": muted,
@@ -32,7 +32,7 @@ def _sem(background, surface, text, muted, border, border_strong,
         "link": link, "link-hover": link_hover,
         "focus-ring": focus, "code-background": code_bg,
         "selection-background": selection,
-        "highlight": highlight, "highlight-text": highlight_text,
+        "accent-2": accent_2, "accent-2-soft": accent_2_soft,
     }
 
 
@@ -49,8 +49,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 700), _v("primary", 800),
                       _v("primary", 400), _v("neutral", 100),
-                      _v("primary", 200),
-                      _v("secondary", 100), _v("secondary", 900)),
+                      _v("secondary", 200),
+                      _v("secondary", 600), _v("secondary", 100)),
         "dark": _sem(_v("neutral", 900), _v("neutral", 800),
                      _v("neutral", 100), _v("neutral", 400),
                      _v("neutral", 700), _v("neutral", 600),
@@ -58,8 +58,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 300), _v("primary", 200),
                      _v("primary", 500), _v("neutral", 800),
-                     _v("primary", 800),
-                     _v("secondary", 800), _v("secondary", 50)),
+                     _v("secondary", 800),
+                     _v("secondary", 400), _v("secondary", 900)),
     },
     "Doux": {
         "light": _sem(_v("primary", 50), "#ffffff",
@@ -69,8 +69,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 600), _v("primary", 700),
                       _v("primary", 300), _v("primary", 50),
-                      _v("primary", 100),
-                      _v("secondary", 100), _v("secondary", 800)),
+                      _v("secondary", 100),
+                      _v("secondary", 500), _v("secondary", 100)),
         "dark": _sem(_v("neutral", 900), _v("neutral", 800),
                      _v("neutral", 200), _v("neutral", 400),
                      _v("neutral", 800), _v("neutral", 700),
@@ -78,8 +78,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 300), _v("primary", 200),
                      _v("primary", 500), _v("neutral", 800),
-                     _v("primary", 800),
-                     _v("secondary", 800), _v("secondary", 100)),
+                     _v("secondary", 800),
+                     _v("secondary", 400), _v("secondary", 900)),
     },
     "Contrasté": {
         "light": _sem("#ffffff", "#ffffff",
@@ -89,8 +89,8 @@ SEMANTIC_TEMPLATES = {
                       _v("primary", 100), "#ffffff",
                       _v("primary", 800), _v("primary", 900),
                       _v("primary", 600), _v("neutral", 100),
-                      _v("primary", 200),
-                      _v("secondary", 200), _v("secondary", 900)),
+                      _v("secondary", 200),
+                      _v("secondary", 700), _v("secondary", 200)),
         "dark": _sem("#000000", _v("neutral", 900),
                      "#ffffff", _v("neutral", 300),
                      _v("neutral", 600), _v("neutral", 500),
@@ -98,8 +98,8 @@ SEMANTIC_TEMPLATES = {
                      _v("primary", 900), _v("neutral", 900),
                      _v("primary", 200), _v("primary", 100),
                      _v("primary", 400), _v("neutral", 900),
-                     _v("primary", 700),
-                     _v("secondary", 700), _v("secondary", 50)),
+                     _v("secondary", 700),
+                     _v("secondary", 300), _v("secondary", 800)),
     },
 }
 
@@ -134,15 +134,21 @@ body {
 
 /* ---- Structure de page ------------------------------------------------ */
 
+/* Gouttière alignant les zones pleine largeur (header, footer, héro) sur
+   le conteneur de <main> : tout le contenu partage le même bord gauche. */
+:root {
+  --gutter: calc(max((100% - var(--container)) / 2, 0px) + var(--space-4));
+}
+
 main {
-  max-width: var(--container-md);
+  max-width: var(--container);
   margin-inline: auto;
-  padding: var(--space-8) var(--space-4);
+  padding: calc(var(--space-8) * var(--density)) var(--space-4);
 }
 
 body > header,
 body > footer {
-  padding: var(--space-4);
+  padding: var(--space-4) var(--gutter);
   border-color: var(--border);
 }
 
@@ -151,31 +157,63 @@ body > header nav {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  max-width: var(--container-lg);
-  margin-inline: auto;
 }
 
 body > header nav ul {
   display: flex;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Liens de navigation principale ; la page courante se signale avec
+   aria-current="page" sur le lien. */
+body > header nav a {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+body > header nav a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+body > header nav a[aria-current] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 body > footer {
-  margin-top: var(--space-12);
+  margin-top: calc(var(--space-12) * var(--density));
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   text-align: center;
 }
 
-section { margin-block: var(--space-12); }
+/* Héro pleine largeur : une <section> placée directement dans <body>,
+   avant <main> ; son contenu reste aligné sur le conteneur. */
+body > section {
+  margin: 0;
+  padding: calc(var(--space-12) * var(--density)) var(--gutter);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+body > section > h1 { margin-top: 0; }
+
+section { margin-block: calc(var(--space-12) * var(--density)); }
 
 /* Une section contenant plusieurs <article> devient une grille de cartes */
 section:has(> article) {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr));
   gap: var(--space-4);
 }
 
@@ -222,13 +260,14 @@ a:hover { color: var(--link-hover); }
 
 small { color: var(--text-muted); }
 
+/* Les citations portent la couleur secondaire (--accent-2) */
 blockquote {
   margin: var(--space-6) 0;
   padding: var(--space-3) var(--space-4);
-  border-inline-start: 4px solid var(--accent);
+  border-inline-start: 4px solid var(--accent-2);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  background: var(--surface);
-  color: var(--text-muted);
+  background: var(--accent-2-soft);
+  color: var(--text);
 }
 
 blockquote > :last-child { margin-bottom: 0; }
@@ -240,8 +279,8 @@ hr {
 }
 
 mark {
-  background: var(--highlight);
-  color: var(--highlight-text);
+  background: var(--accent-soft);
+  color: var(--text);
   padding: 0.1em 0.3em;
   border-radius: var(--radius-sm);
 }
@@ -413,6 +452,11 @@ body > header {
   border-bottom: 1px solid var(--border);
   z-index: 10;
 }
+
+body > header nav a { border-radius: var(--radius-full); }
+
+body > header nav a:hover,
+body > header nav a[aria-current] { background: var(--accent-soft); }
 """,
     "Classique": """\
 /* ---- Variante : Classique ---------------------------------------------- */
@@ -438,6 +482,14 @@ button, input[type="submit"], input[type="button"] {
 }
 
 body > header { border-bottom: 2px solid var(--border-strong); }
+
+body > header nav a { border-radius: 0; }
+
+body > header nav a:hover { text-decoration: underline; }
+
+body > header nav a[aria-current] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
 """,
     "Minimal": """\
 /* ---- Variante : Minimal ------------------------------------------------ */
@@ -466,6 +518,16 @@ button:hover, input[type="submit"]:hover, input[type="button"]:hover {
 hr { width: var(--space-24); margin-inline: auto; }
 
 body > footer { border-top: none; }
+
+body > header nav a { padding-inline: 0; border-radius: 0; }
+
+body > header nav ul { gap: var(--space-4); }
+
+body > header nav a[aria-current] {
+  text-decoration: underline;
+  text-underline-offset: 0.35em;
+  text-decoration-color: var(--accent);
+}
 """,
 }
 
@@ -473,6 +535,10 @@ body > footer { border-top: none; }
 # ---------------------------------------------------------------------------
 # Assemblage du fichier CSS
 # ---------------------------------------------------------------------------
+
+def _fmt2(v):
+    return f"{v:g}"
+
 
 def _block(selector, lines, indent="  "):
     body = "\n".join(f"{indent}{line}" for line in lines)
@@ -508,13 +574,15 @@ def generate_css(cfg: Config) -> str:
     root.append(f"--font-mono: {FONT_STACKS[cfg.font_mono]};")
     root += [f"--text-{name}: {value};" for name, value in texts.items()]
     root.append("--leading-tight: 1.2;")
-    root.append("--leading-normal: 1.65;")
+    root.append(f"--leading-normal: {cfg.leading};")
     root.append("")
     root.append("/* Espacements (1rem = 16px) */")
     root += [f"--space-{m}: {value};" for m, value in spaces.items()]
-    root.append("--container-sm: 40rem;")
-    root.append("--container-md: 56rem;")
-    root.append("--container-lg: 72rem;")
+    root.append("")
+    root.append("/* Mise en page */")
+    root.append(f"--container: {CONTAINERS[cfg.container]};")
+    root.append(f"--density: {_fmt2(DENSITIES[cfg.density])};")
+    root.append(f"--card-min: {cfg.card_min}rem;")
     root.append("")
     root.append("/* Rayons de bordure */")
     root += [f"--radius-{name}: {value};" for name, value in radii.items()]
@@ -528,8 +596,8 @@ def generate_css(cfg: Config) -> str:
         f"   Date : {date.today().isoformat()}",
         f"   Base : primaire {cfg.primary} · secondaire {cfg.secondary}"
         f" · {cfg.base_size}px · ratio {cfg.ratio}",
-        f"   Templates : sémantique « {cfg.semantic_template} »"
-        f" · éléments « {cfg.element_template} »",
+        f"   Templates : ambiance des couleurs « {cfg.semantic_template} »"
+        f" · style graphique « {cfg.element_template} »",
         "",
         "   Aucune classe CSS : les variables sont consommées directement par",
         "   les éléments HTML. Forcer un thème : <html data-theme=\"dark\">.",

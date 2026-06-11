@@ -19,24 +19,23 @@ PAGES = {
   <nav>
     <strong>Atelier Lumen</strong>
     <ul>
-      <li><a href="#">Produit</a></li>
+      <li><a href="#" aria-current="page">Produit</a></li>
       <li><a href="#">Tarifs</a></li>
       <li><a href="#">Contact</a></li>
     </ul>
   </nav>
 </header>
+<section>
+  <h1>Concevez vos interfaces avec un système, pas au hasard</h1>
+  <p>Atelier Lumen unifie couleurs, typographie et espacements dans
+     <mark>une seule feuille de styles</mark>, prête à servir tous
+     vos projets.</p>
+  <p>
+    <button>Commencer gratuitement</button>
+    <a href="#">Voir la démonstration</a>
+  </p>
+</section>
 <main>
-  <section>
-    <h1>Concevez vos interfaces avec un système, pas au hasard</h1>
-    <p>Atelier Lumen unifie couleurs, typographie et espacements dans
-       <mark>une seule feuille de styles</mark>, prête à servir tous
-       vos projets.</p>
-    <p>
-      <button>Commencer gratuitement</button>
-      <a href="#">Voir la démonstration</a>
-    </p>
-  </section>
-
   <section>
     <h2>Pourquoi un design système&nbsp;?</h2>
     <article>
@@ -89,7 +88,7 @@ PAGES = {
   <nav>
     <strong>Le Carnet</strong>
     <ul>
-      <li><a href="#">Articles</a></li>
+      <li><a href="#" aria-current="page">Articles</a></li>
       <li><a href="#">Archives</a></li>
       <li><a href="#">À propos</a></li>
     </ul>
@@ -161,7 +160,7 @@ PAGES = {
   <nav>
     <strong>Support</strong>
     <ul>
-      <li><a href="#">Documentation</a></li>
+      <li><a href="#" aria-current="page">Documentation</a></li>
       <li><a href="#">Statut</a></li>
     </ul>
   </nav>

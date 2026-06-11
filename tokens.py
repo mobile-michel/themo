@@ -56,7 +56,22 @@ RATIOS = [
     ("1.618 — Nombre d'or", 1.618),
 ]
 
-SPACING_BASES = [4, 8]
+# Largeur maximale de la zone de contenu (libellé -> valeur CSS)
+CONTAINERS = {
+    "Étroit": "40rem",
+    "Moyen": "56rem",
+    "Large": "72rem",
+    "Pleine largeur": "100%",
+}
+
+# Densité verticale : facteur appliqué au rythme macro de la page
+# (espacement entre sections, padding vertical), indépendant de l'unité
+# d'espacement qui règle le micro (composants, gaps).
+DENSITIES = {
+    "Compact": 0.6,
+    "Normal": 1.0,
+    "Aéré": 1.5,
+}
 
 
 @dataclass
@@ -68,9 +83,13 @@ class Config:
     font_mono: str = "Monospace Code"
     base_size: int = 16          # px — taille du texte courant
     ratio: float = 1.25          # ratio de l'échelle typographique
-    spacing_base: int = 4        # px — unité d'espacement
+    leading: float = 1.65        # hauteur de ligne du texte courant
+    spacing_base: float = 4.0    # px — unité d'espacement (pas de 0,5)
     radius: int = 8              # px — rayon de bordure de référence
     shadow_alpha: int = 12       # % — opacité des ombres
+    container: str = "Moyen"     # largeur de la zone de contenu
+    density: str = "Normal"      # rythme vertical macro
+    card_min: int = 14           # rem — largeur minimale des cartes
     semantic_template: str = "Neutre"
     element_template: str = "Moderne"
     include_dark: bool = True
