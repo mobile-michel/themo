@@ -38,6 +38,7 @@ cp themo.desktop ~/.local/share/applications/
 
 ## Utilisation
 
+- Le style graphique, tout en haut, prérègle l'ensemble des tokens selon son caractère (Moderne, Classique, Minimal) ; chaque token reste ensuite ajustable librement, et le bouton de réinitialisation réaligne le tout sur le style courant.
 - La barre latérale modifie les tokens, l'aperçu se met à jour en direct.
 - Le sélecteur en haut change la page de démonstration (Vitrine / Article / Formulaire) ; le bouton lune bascule clair/sombre.
 - **Exporter → Exporter le CSS…** : écrit `design-system.css`.

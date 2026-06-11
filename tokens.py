@@ -74,12 +74,46 @@ DENSITIES = {
 }
 
 
+# Préréglages : chaque style graphique définit un jeu complet de tokens
+# qui reflète son caractère ; l'utilisateur les ajuste ensuite librement.
+STYLE_PRESETS = {
+    "Moderne": {
+        "primary": "#3b82f6", "secondary": "#f59e0b",
+        "semantic_template": "Neutre",
+        "font_heading": "Geometric Humanist", "font_body": "Neo-Grotesque",
+        "font_mono": "Monospace Code",
+        "base_size": 16, "ratio": 1.25, "leading": 1.65,
+        "spacing_base": 4.0, "radius": 8, "shadow_alpha": 12,
+        "container": "Moyen", "density": "Normal", "card_min": 14,
+    },
+    "Classique": {
+        "primary": "#1e40af", "secondary": "#b45309",
+        "semantic_template": "Contrasté",
+        "font_heading": "Didone", "font_body": "Transitional",
+        "font_mono": "Monospace Slab Serif",
+        "base_size": 17, "ratio": 1.2, "leading": 1.7,
+        "spacing_base": 4.0, "radius": 2, "shadow_alpha": 6,
+        "container": "Moyen", "density": "Normal", "card_min": 16,
+    },
+    "Minimal": {
+        "primary": "#334155", "secondary": "#64748b",
+        "semantic_template": "Doux",
+        "font_heading": "Industrial", "font_body": "Humanist",
+        "font_mono": "Monospace Code",
+        "base_size": 16, "ratio": 1.2, "leading": 1.8,
+        "spacing_base": 5.0, "radius": 0, "shadow_alpha": 0,
+        "container": "Étroit", "density": "Aéré", "card_min": 16,
+    },
+}
+
+
 @dataclass
 class Config:
+    # Valeurs par défaut = préréglage « Moderne »
     primary: str = "#3b82f6"
     secondary: str = "#f59e0b"
     font_heading: str = "Geometric Humanist"
-    font_body: str = "Classical Humanist"
+    font_body: str = "Neo-Grotesque"
     font_mono: str = "Monospace Code"
     base_size: int = 16          # px — taille du texte courant
     ratio: float = 1.25          # ratio de l'échelle typographique

@@ -29,7 +29,7 @@ gi.require_version("WebKit", "6.0")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, WebKit  # noqa: E402
 
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
-                    RATIOS, CONTAINERS, DENSITIES)
+                    RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
 from pages import PAGES, wrap_preview, wrap_export  # noqa: E402
 
@@ -48,7 +48,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         self.cfg = Config()
         self._refresh_id = 0
-        self._resets = []  # remises aux valeurs par défaut (tokens seulement)
+        self._setters = {}  # attr -> fn(valeur) pour réaligner les widgets
 
         self.set_title("Thémo")
         self.set_default_size(1280, 860)
@@ -71,9 +71,27 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _build_sidebar(self):
         page = Adw.PreferencesPage()
 
+        grp = Adw.PreferencesGroup(
+            title="Style graphique",
+            description="Prérègle tous les tokens selon son caractère",
+        )
+        row = self._combo_row("Style", list(ELEMENT_TEMPLATES),
+                              "element_template", tracked=False)
+        row.set_subtitle("Styles des balises HTML")
+        grp.add(row)
+        page.add(grp)
+
         grp = Adw.PreferencesGroup(title="Couleurs")
         grp.add(self._color_row("Couleur primaire", "primary"))
         grp.add(self._color_row("Couleur secondaire", "secondary"))
+        row = self._combo_row("Ambiance des couleurs",
+                              list(SEMANTIC_TEMPLATES), "semantic_template")
+        row.set_subtitle("Tokens sémantiques")
+        grp.add(row)
+        dark = Adw.SwitchRow(title="Inclure le mode sombre")
+        dark.set_active(self.cfg.include_dark)
+        dark.connect("notify::active", self._on_switch, "include_dark")
+        grp.add(dark)
         page.add(grp)
 
         grp = Adw.PreferencesGroup(
@@ -112,32 +130,12 @@ class ThemoWindow(Adw.ApplicationWindow):
                                "card_min"))
         page.add(grp)
 
-        grp = Adw.PreferencesGroup(
-            title="Templates",
-            description="Application des couleurs et dessin des éléments",
-        )
-        row = self._combo_row(
-            "Ambiance des couleurs", list(SEMANTIC_TEMPLATES),
-            "semantic_template", resettable=False)
-        row.set_subtitle("Tokens sémantiques")
-        grp.add(row)
-        row = self._combo_row(
-            "Style graphique", list(ELEMENT_TEMPLATES),
-            "element_template", resettable=False)
-        row.set_subtitle("Styles des balises HTML")
-        grp.add(row)
-        dark = Adw.SwitchRow(title="Inclure le mode sombre")
-        dark.set_active(self.cfg.include_dark)
-        dark.connect("notify::active", self._on_switch, "include_dark")
-        grp.add(dark)
-        page.add(grp)
-
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(
             title="Thémo", subtitle="Design système → CSS"))
         reset = Gtk.Button(
             icon_name="edit-undo-symbolic",
-            tooltip_text="Réinitialiser les tokens (les templates sont conservés)")
+            tooltip_text="Réaligner les tokens sur le style graphique courant")
         reset.connect("clicked", self._reset_tokens)
         header.pack_start(reset)
 
@@ -149,18 +147,23 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _color_row(self, title, attr):
         row = Adw.ActionRow(title=title)
         btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog())
-        default = Gdk.RGBA()
-        default.parse(getattr(self.cfg, attr))
-        btn.set_rgba(default)
+        rgba = Gdk.RGBA()
+        rgba.parse(getattr(self.cfg, attr))
+        btn.set_rgba(rgba)
         btn.set_valign(Gtk.Align.CENTER)
         btn.connect("notify::rgba", self._on_color, attr)
-        self._resets.append(lambda: btn.set_rgba(default))
+
+        def set_hex(value):
+            rgba = Gdk.RGBA()
+            rgba.parse(value)
+            btn.set_rgba(rgba)
+        self._setters[attr] = set_hex
         row.add_suffix(btn)
         row.set_activatable_widget(btn)
         return row
 
     def _combo_row(self, title, labels, attr, values=None, default_index=0,
-                   resettable=True):
+                   tracked=True):
         row = Adw.ComboRow(title=title)
         row.set_model(Gtk.StringList.new(labels))
         current = getattr(self.cfg, attr)
@@ -168,18 +171,17 @@ class ThemoWindow(Adw.ApplicationWindow):
         index = options.index(current) if current in options else default_index
         row.set_selected(index)
         row.connect("notify::selected", self._on_combo, attr, options)
-        if resettable:
-            self._resets.append(lambda: row.set_selected(index))
+        if tracked:
+            self._setters[attr] = lambda v: row.set_selected(options.index(v))
         return row
 
     def _spin_row(self, title, lo, hi, attr, step=1, digits=0):
         row = Adw.SpinRow.new_with_range(lo, hi, step)
         row.set_digits(digits)
         row.set_title(title)
-        default = getattr(self.cfg, attr)
-        row.set_value(default)
+        row.set_value(getattr(self.cfg, attr))
         row.connect("notify::value", self._on_spin, attr)
-        self._resets.append(lambda: row.set_value(default))
+        self._setters[attr] = row.set_value
         return row
 
     # -- Zone d'aperçu -------------------------------------------------------
@@ -220,6 +222,8 @@ class ThemoWindow(Adw.ApplicationWindow):
 
     def _on_combo(self, row, _pspec, attr, options):
         setattr(self.cfg, attr, options[row.get_selected()])
+        if attr == "element_template":
+            self._apply_preset(self.cfg.element_template)
         self._schedule_refresh()
 
     def _on_spin(self, row, _pspec, attr):
@@ -228,21 +232,17 @@ class ThemoWindow(Adw.ApplicationWindow):
                 round(value, 2) if row.get_digits() else int(value))
         self._schedule_refresh()
 
-    # Tokens remis à zéro par le bouton — les templates n'en font pas partie
-    _TOKEN_ATTRS = ("primary", "secondary", "font_heading", "font_body",
-                    "font_mono", "base_size", "ratio", "leading",
-                    "spacing_base", "radius", "shadow_alpha",
-                    "container", "density", "card_min")
-
-    def _reset_tokens(self, *_args):
-        defaults = Config()
-        for attr in self._TOKEN_ATTRS:
-            setattr(self.cfg, attr, getattr(defaults, attr))
-        for restore in self._resets:
-            restore()
+    def _apply_preset(self, style):
+        """Aligne tous les tokens sur le préréglage du style graphique."""
+        for attr, value in STYLE_PRESETS[style].items():
+            setattr(self.cfg, attr, value)
+            self._setters[attr](value)
         self._schedule_refresh()
         self.toasts.add_toast(Adw.Toast(
-            title="Tokens réinitialisés (templates conservés)"))
+            title=f"Tokens alignés sur le style « {style} »"))
+
+    def _reset_tokens(self, *_args):
+        self._apply_preset(self.cfg.element_template)
 
     def _on_switch(self, row, _pspec, attr):
         setattr(self.cfg, attr, row.get_active())

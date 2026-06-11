@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.4.0 — Le style graphique devient un préréglage complet (11 juin 2026)
+
+**Description courte :** barre latérale réorganisée — Style graphique en tête, Ambiance des couleurs et mode sombre dans Couleurs — et chaque style graphique prérègle désormais l'ensemble des tokens selon son caractère.
+
+**Explication commentée :**
+
+- *Réorganisation* — « Style graphique » occupe le haut de la barre latérale ; « Ambiance des couleurs » et « Inclure le mode sombre » rejoignent le groupe Couleurs ; le groupe Templates disparaît.
+- *Préréglages* — choisir Moderne, Classique ou Minimal aligne tous les tokens (couleurs, ambiance, typographie, taille, ratio, interligne, espacement, rayon, ombres, largeur, densité, cartes) sur le caractère du style : Moderne = bleu vif/ambre, Neutre, Geometric Humanist + Neo-Grotesque, rayons 8 px ; Classique = bleu profond/cuivre, Contrasté, Didone + Transitional + Monospace Slab Serif, 17 px, rayons 2 px, ombres discrètes ; Minimal = ardoise/gris bleuté, Doux, Industrial + Humanist, étroit et aéré, sans rayons ni ombres.
+- *Ajustement libre* — après application du préréglage, chaque token reste modifiable individuellement ; un toast confirme l'alignement.
+- *Réinitialisation* — le bouton réaligne les tokens sur le préréglage du style courant (et non plus sur un défaut unique) ; les défauts de l'application correspondent au préréglage Moderne.
+
+---
+
 ## v1.3.0 — Mise en page, navigation et couleur secondaire (11 juin 2026)
 
 **Description courte :** nouveau groupe de réglages « Mise en page » avec héro pleine largeur, unité d'espacement plus fine, libellés de templates clarifiés, navigation principale stylée et couleur secondaire réaffectée aux citations et à la sélection.
