@@ -33,12 +33,103 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GtkSource, WebKit  # noqa: E
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
-from pages import (MODELS, BLOCKS, insert_block,  # noqa: E402
+from pages import (MODELS, PROJECT_MODELS, MODEL_DESCRIPTIONS,  # noqa: E402
+                   BLOCKS, insert_block, propagate_chrome,
                    nav_add_link, nav_remove_link, nav_rename_link,
                    nav_set_links, wrap_preview, wrap_export)
 from project import Project, slugify  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
+
+# Style graphique appliqué d'office au modèle de projet qui a le sien ;
+# l'utilisateur peut ensuite en changer librement dans la barre latérale.
+MODEL_STYLES = {
+    "Blog": "Éditorial",
+    "Portfolio": "Galerie",
+    "Personnel": "Chaleureux",
+    "Événement": "Festif",
+    "Institutionnel": "Officiel",
+}
+
+
+def _model_thumbnail_svg(model):
+    """Vignette d'un modèle de projet : schéma filaire de sa page d'accueil,
+    coloré avec les couleurs du préréglage de style associé."""
+    preset = STYLE_PRESETS[MODEL_STYLES.get(model, "Moderne")]
+    p, s = preset["primary"], preset["secondary"]
+    g, t = "#dde3ea", "#b6c0cb"  # filets / lignes de texte
+    e = []
+
+    def line(x, y, w, color, h=4):
+        e.append(f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
+                 f"rx='{h / 2}' fill='{color}'/>")
+
+    def box(x, y, w, h, color, rx=3, op=1.0):
+        e.append(f"<rect x='{x}' y='{y}' width='{w}' height='{h}' "
+                 f"rx='{rx}' fill='{color}' opacity='{op}'/>")
+
+    # en-tête commun : marque + liens de navigation
+    line(12, 10, 30, p, 5)
+    for x in (128, 148, 168):
+        line(x, 11, 14, t, 3)
+    box(0, 24, 200, 1, g, rx=0)
+
+    if model == "Blog":
+        line(12, 36, 104, t, 6)
+        line(12, 47, 44, g, 3)
+        for y in (60, 84, 108):
+            line(12, y, 76, t, 5)
+            line(12, y + 9, 176, g, 3)
+            line(12, y + 15, 120, g, 3)
+    elif model == "Portfolio":
+        line(12, 36, 80, t, 6)
+        for x in (12, 73, 134):
+            box(x, 48, 54, 40, p, 2, 0.3)
+            line(x, 94, 34, g, 3)
+        line(12, 108, 140, g, 3)
+        line(12, 116, 100, g, 3)
+    elif model == "Personnel":
+        e.append(f"<circle cx='34' cy='58' r='18' fill='{p}' opacity='0.3'/>")
+        line(62, 44, 92, t, 6)
+        line(62, 56, 120, g, 3)
+        line(62, 64, 104, g, 3)
+        for y, w in ((92, 130), (102, 112), (112, 124)):
+            line(12, y, w, g, 3)
+    elif model == "Événement":
+        e.append("<defs><linearGradient id='h' x1='0' y1='0' x2='1' y2='1'>"
+                 f"<stop offset='0' stop-color='{p}'/>"
+                 f"<stop offset='1' stop-color='{s}'/></linearGradient></defs>")
+        e.append("<rect x='12' y='32' width='176' height='32' rx='4' "
+                 "fill='url(#h)' opacity='0.3'/>")
+        line(24, 40, 96, t, 5)
+        box(24, 50, 28, 8, p, rx=4)
+        for y in (76, 90, 104, 118):
+            line(12, y, 20, s, 4)
+            line(40, y, 120, g, 4)
+    elif model == "Institutionnel":
+        for x in (12, 73, 134):
+            box(x, 34, 54, 30, g, 3, 0.45)
+            box(x, 34, 54, 3, p, rx=1.5)
+        for y, w in ((76, 150), (88, 176), (100, 132), (112, 160)):
+            line(12, y, w, g, 3)
+    elif model == "Page vide":
+        line(12, 40, 70, t, 6)
+        line(12, 52, 110, g, 3)
+    else:  # Démonstration
+        box(12, 32, 176, 28, p, 4, 0.15)
+        line(24, 40, 80, t, 5)
+        line(24, 50, 56, g, 3)
+        for x in (12, 73, 134):
+            box(x, 68, 54, 34, g, 4, 0.45)
+        line(12, 112, 120, g, 3)
+        line(12, 121, 90, g, 3)
+
+    return ("<svg xmlns='http://www.w3.org/2000/svg' width='200' "
+            "height='140' viewBox='0 0 200 140'>"
+            "<rect width='200' height='140' rx='8' fill='#ffffff'/>"
+            + "".join(e) +
+            f"<rect x='0.5' y='0.5' width='199' height='139' rx='8' "
+            f"fill='none' stroke='{g}'/></svg>")
 
 
 def _rgba_to_hex(rgba: Gdk.RGBA) -> str:
@@ -59,6 +150,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._buffer_lock = False  # vrai pendant le chargement de l'éditeur
         self._dirty = False
         self._loaded_page = None  # page actuellement rendue dans l'aperçu
+        self._current_page = None  # page affichée et éditée
 
         self.set_default_size(1280, 900)
 
@@ -74,8 +166,7 @@ class ThemoWindow(Adw.ApplicationWindow):
 
         self._install_actions()
         self._update_title()
-        self._load_page_into_editor()
-        self._refresh()
+        self._show_page()
 
     # -- Barre latérale : les tokens de base --------------------------------
 
@@ -218,20 +309,82 @@ class ThemoWindow(Adw.ApplicationWindow):
             sync_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
             WebKit.UserScriptInjectionTime.END, None, None))
 
+        # Mode « supprimer un bloc » : survol = surlignage du bloc candidat
+        # (enfant direct de <main>, ou section héro sous <body>), clic =
+        # suppression puis renvoi du <body> à l'application.
+        ucm.register_script_message_handler("blockRemoved", None)
+        ucm.connect("script-message-received::blockRemoved",
+                    self._on_block_removed)
+        delete_js = """
+        (function () {
+          let armed = false, cur = null;
+          function candidate(el) {
+            while (el && el !== document.body) {
+              const par = el.parentElement;
+              if (par && (par.tagName === 'MAIN' ||
+                  (par === document.body && el.tagName === 'SECTION')))
+                return el;
+              el = par;
+            }
+            return null;
+          }
+          function clear() {
+            if (cur) { cur.style.outline = ''; cur.style.cursor = ''; }
+            cur = null;
+          }
+          document.addEventListener('mouseover', function (ev) {
+            if (!armed) return;
+            const c = candidate(ev.target);
+            if (c === cur) return;
+            clear();
+            if (c) {
+              cur = c;
+              cur.style.outline = '2px dashed #dc2626';
+              cur.style.cursor = 'pointer';
+            }
+          });
+          document.addEventListener('click', function (ev) {
+            if (!armed) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            const c = candidate(ev.target);
+            if (!c) return;
+            clear();
+            c.remove();
+            window.webkit.messageHandlers.blockRemoved.postMessage(
+              document.body.innerHTML);
+          }, true);
+          window._themoBlockDelete = function (on) {
+            armed = on;
+            if (!on) clear();
+          };
+        })();
+        """
+        ucm.add_script(WebKit.UserScript.new(
+            delete_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
+            WebKit.UserScriptInjectionTime.END, None, None))
+
         self.webview = WebKit.WebView(user_content_manager=ucm)
         self.webview.set_vexpand(True)
         self.webview.connect("load-changed", self._on_load_changed)
         self.webview.connect("decide-policy", self._on_decide_policy)
 
-        self.page_selector = Gtk.DropDown.new_from_strings(
-            list(self.project.pages))
-        self.page_selector.connect("notify::selected", self._on_page_selected)
+        # La page courante s'affiche en titre ; on passe de page en page
+        # par les liens de navigation de l'aperçu.
+        self.page_label = Gtk.Label()
+        self.page_label.add_css_class("heading")
 
+        manage_menu = Gio.Menu()
+        manage_menu.append("Ajouter une page…", "win.page-add")
+        manage_menu.append("Dupliquer la page", "win.page-duplicate")
+        manage_menu.append("Renommer la page…", "win.page-rename")
+        manage_menu.append("Supprimer la page…", "win.page-delete")
+        # Garde-fou : toutes les pages restent accessibles ici, même si
+        # leur lien a disparu de la navigation.
+        self.pages_list_menu = Gio.Menu()
         pages_menu = Gio.Menu()
-        pages_menu.append("Ajouter une page…", "win.page-add")
-        pages_menu.append("Dupliquer la page", "win.page-duplicate")
-        pages_menu.append("Renommer la page…", "win.page-rename")
-        pages_menu.append("Supprimer la page…", "win.page-delete")
+        pages_menu.append_section(None, manage_menu)
+        pages_menu.append_section("Aller à la page", self.pages_list_menu)
         pages_btn = Gtk.MenuButton(icon_name="view-more-symbolic",
                                    menu_model=pages_menu,
                                    tooltip_text="Gérer les pages")
@@ -251,7 +404,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                                     tooltip_text="Insérer un bloc dans la page")
 
         title_box = Gtk.Box(spacing=6)
-        title_box.append(self.page_selector)
+        title_box.append(self.page_label)
         title_box.append(pages_btn)
         title_box.append(blocks_btn)
 
@@ -269,6 +422,11 @@ class ThemoWindow(Adw.ApplicationWindow):
             icon_name="edit-select-text-symbolic",
             tooltip_text="Éditer le texte directement dans l'aperçu")
         self.wysiwyg_toggle.connect("toggled", self._on_wysiwyg_toggled)
+
+        self.delete_toggle = Gtk.ToggleButton(
+            icon_name="user-trash-symbolic",
+            tooltip_text="Supprimer des blocs en cliquant dans l'aperçu")
+        self.delete_toggle.connect("toggled", self._on_delete_toggled)
 
         project_menu = Gio.Menu()
         sect = Gio.Menu()
@@ -294,6 +452,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         header.set_title_widget(title_box)
         header.pack_start(self.dark_toggle)
         header.pack_start(self.wysiwyg_toggle)
+        header.pack_start(self.delete_toggle)
         header.pack_start(self.editor_toggle)
         header.pack_end(burger)
         header.pack_end(export)
@@ -342,25 +501,28 @@ class ThemoWindow(Adw.ApplicationWindow):
     # -- Pages -------------------------------------------------------------------
 
     def _current_page_name(self):
-        names = list(self.project.pages)
-        idx = self.page_selector.get_selected()
-        return names[idx] if 0 <= idx < len(names) else names[0]
+        if self._current_page not in self.project.pages:
+            self._current_page = next(iter(self.project.pages))
+        return self._current_page
 
-    def _rebuild_page_selector(self, select=None):
-        names = list(self.project.pages)
-        self._loading = True
-        self.page_selector.set_model(Gtk.StringList.new(names))
-        self.page_selector.set_selected(
-            names.index(select) if select in names else 0)
-        self._loading = False
+    def _show_page(self, name=None):
+        """Fait de `name` (ou d'une page valide) la page affichée et éditée."""
+        if name in self.project.pages:
+            self._current_page = name
+        current = self._current_page_name()
+        self.page_label.set_text(current)
+        self.pages_list_menu.remove_all()
+        for page in self.project.pages:
+            item = Gio.MenuItem.new(page, None)
+            item.set_action_and_target_value(
+                "win.page-show", GLib.Variant.new_string(page))
+            self.pages_list_menu.append_item(item)
+        self._page_show_action.set_state(GLib.Variant.new_string(current))
         self._load_page_into_editor()
         self._schedule_refresh()
 
-    def _on_page_selected(self, *_args):
-        if self._loading:
-            return
-        self._load_page_into_editor()
-        self._schedule_refresh()
+    def _page_show(self, _action, param):
+        self._show_page(param.get_string())
 
     def _load_page_into_editor(self):
         self._buffer_lock = True
@@ -398,12 +560,35 @@ class ThemoWindow(Adw.ApplicationWindow):
         if btn.get_active():
             if self.editor_toggle.get_active():
                 self.editor_toggle.set_active(False)
+            if self.delete_toggle.get_active():
+                self.delete_toggle.set_active(False)
             self._set_design_mode(True)
             self.toasts.add_toast(Adw.Toast(
                 title="Édition du texte activée — cliquez dans l'aperçu"))
         else:
             self._set_design_mode(False)
             self._load_page_into_editor()
+
+    def _on_delete_toggled(self, btn):
+        if btn.get_active():
+            if self.wysiwyg_toggle.get_active():
+                self.wysiwyg_toggle.set_active(False)
+            self._run_js("window._themoBlockDelete(true);")
+            self.toasts.add_toast(Adw.Toast(
+                title="Cliquez un bloc dans l'aperçu pour le supprimer"))
+        else:
+            self._run_js("window._themoBlockDelete(false);")
+
+    def _on_block_removed(self, _ucm, value):
+        if self._loaded_page not in self.project.pages:
+            return
+        html = value.to_string()
+        if not html.endswith("\n"):
+            html += "\n"
+        self.project.pages[self._loaded_page] = html
+        self._touch()
+        self._load_page_into_editor()
+        self.toasts.add_toast(Adw.Toast(title="Bloc supprimé"))
 
     def _on_decide_policy(self, _webview, decision, dtype):
         """Suivre les liens internes dans l'aperçu, sans fichiers réels.
@@ -426,8 +611,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         slug = uri.rsplit("/", 1)[-1][:-len(".html")]
         for name in self.project.pages:
             if slugify(name) == slug:
-                names = list(self.project.pages)
-                self.page_selector.set_selected(names.index(name))
+                self._show_page(name)
                 break
         else:
             self.toasts.add_toast(Adw.Toast(
@@ -435,10 +619,13 @@ class ThemoWindow(Adw.ApplicationWindow):
         return True
 
     def _on_load_changed(self, _webview, event):
-        # réactiver l'édition après chaque rechargement de l'aperçu
-        if (event == WebKit.LoadEvent.FINISHED
-                and self.wysiwyg_toggle.get_active()):
+        # réactiver les modes d'édition après chaque rechargement de l'aperçu
+        if event != WebKit.LoadEvent.FINISHED:
+            return
+        if self.wysiwyg_toggle.get_active():
             self._set_design_mode(True)
+        if self.delete_toggle.get_active():
+            self._run_js("window._themoBlockDelete(true);")
 
     def _on_wysiwyg_edit(self, _ucm, value):
         # cible : la page rendue dans l'aperçu (et non la sélection courante,
@@ -449,6 +636,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         if not html.endswith("\n"):
             html += "\n"
         self.project.pages[self._loaded_page] = html
+        # header et footer sont communs à tout le site
+        propagate_chrome(self.project.pages, self._loaded_page)
         self._touch()
 
     def _on_editor_changed(self, buffer):
@@ -456,7 +645,9 @@ class ThemoWindow(Adw.ApplicationWindow):
             return
         text = buffer.get_text(buffer.get_start_iter(),
                                buffer.get_end_iter(), True)
-        self.project.pages[self._current_page_name()] = text
+        name = self._current_page_name()
+        self.project.pages[name] = text
+        propagate_chrome(self.project.pages, name)
         self._touch()
         self._schedule_refresh()
 
@@ -492,7 +683,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             self.project.pages[name] = MODELS[model]
             self._sync_navigation_add(name)
             self._touch()
-            self._rebuild_page_selector(select=name)
+            self._show_page(name)
         dialog.choose(self, None, done)
 
     def _sync_navigation_add(self, name):
@@ -510,7 +701,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         self.project.pages[name] = self.project.pages[current]
         self._sync_navigation_add(name)
         self._touch()
-        self._rebuild_page_selector(select=name)
+        self._show_page(name)
 
     def _page_rename(self, *_args):
         current = self._current_page_name()
@@ -538,7 +729,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                 (new if k == current else k): nav_rename_link(v, current, new)
                 for k, v in self.project.pages.items()}
             self._touch()
-            self._rebuild_page_selector(select=new)
+            self._show_page(new)
         dialog.choose(self, None, done)
 
     def _block_insert(self, _action, param):
@@ -575,7 +766,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                 self.project.pages[other] = nav_remove_link(
                     self.project.pages[other], current)
             self._touch()
-            self._rebuild_page_selector()
+            self._show_page()
         dialog.choose(self, None, done)
 
     # -- Réactions aux changements -------------------------------------------
@@ -660,12 +851,83 @@ class ThemoWindow(Adw.ApplicationWindow):
             setter(getattr(self.cfg, attr))
         self._loading = False
         self._dirty = False
-        self._rebuild_page_selector()
+        self._current_page = None
+        self._show_page()
         self._update_title()
 
+    def _model_card(self, name):
+        """Carte d'un modèle : vignette, nom, nombre de pages, description."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                      margin_top=12, margin_bottom=12,
+                      margin_start=12, margin_end=12)
+        try:
+            texture = Gdk.Texture.new_from_bytes(
+                GLib.Bytes.new(_model_thumbnail_svg(name).encode()))
+            box.append(Gtk.Picture.new_for_paintable(texture))
+        except GLib.Error:
+            pass  # pas de chargeur SVG : la carte reste textuelle
+        title = Gtk.Label(label=name)
+        title.add_css_class("heading")
+        box.append(title)
+        n = len(PROJECT_MODELS[name])
+        count = Gtk.Label(label=f"{n} page{'s' if n > 1 else ''}")
+        count.add_css_class("caption")
+        count.add_css_class("dim-label")
+        box.append(count)
+        desc = Gtk.Label(label=MODEL_DESCRIPTIONS.get(name, ""))
+        desc.add_css_class("caption")
+        desc.set_wrap(True)
+        desc.set_justify(Gtk.Justification.CENTER)
+        desc.set_max_width_chars(28)
+        box.append(desc)
+        child = Gtk.FlowBoxChild(child=box)
+        child.add_css_class("card")
+        child.add_css_class("activatable")
+        return child
+
+    def _choose_model(self, heading):
+        """Galerie des modèles de projet ; Échap conserve le projet courant."""
+        names = list(PROJECT_MODELS)
+        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE,
+                           homogeneous=True, column_spacing=12,
+                           row_spacing=12, margin_top=12, margin_bottom=12,
+                           margin_start=12, margin_end=12,
+                           valign=Gtk.Align.START,
+                           min_children_per_line=2, max_children_per_line=3)
+        for name in names:
+            flow.append(self._model_card(name))
+        dialog = Adw.Dialog(title=heading,
+                            content_width=780, content_height=620)
+
+        def activated(_flow, child):
+            dialog.close()
+            self._create_project_from_model(names[child.get_index()])
+        flow.connect("child-activated", activated)
+
+        scroller = Gtk.ScrolledWindow(child=flow)
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(scroller)
+        dialog.set_child(view)
+        dialog.present(self)
+
+    def _create_project_from_model(self, name):
+        cfg = Config()
+        style = MODEL_STYLES.get(name)
+        if style:
+            cfg.element_template = style
+            for attr, value in STYLE_PRESETS[style].items():
+                setattr(cfg, attr, value)
+        self._adopt_project(Project(cfg=cfg, pages=PROJECT_MODELS[name]))
+        self.toasts.add_toast(Adw.Toast(
+            title=f"Nouveau projet — modèle « {name} »"))
+
+    def show_welcome(self):
+        self._choose_model("Bienvenue dans Thémo — choisissez un modèle")
+
     def _project_new(self, *_args):
-        self._adopt_project(Project())
-        self.toasts.add_toast(Adw.Toast(title="Nouveau projet"))
+        self._choose_model("Nouveau projet")
 
     def _project_open(self, *_args):
         dialog = Gtk.FileDialog(title="Ouvrir un dossier de projet Thémo")
@@ -734,6 +996,12 @@ class ThemoWindow(Adw.ApplicationWindow):
                                       GLib.VariantType.new("s"))
         action.connect("activate", self._block_insert)
         self.add_action(action)
+        # action à état : la page courante est cochée dans le menu
+        self._page_show_action = Gio.SimpleAction.new_stateful(
+            "page-show", GLib.VariantType.new("s"),
+            GLib.Variant.new_string(""))
+        self._page_show_action.connect("activate", self._page_show)
+        self.add_action(self._page_show_action)
 
     def _export_css(self, *_args):
         dialog = Gtk.FileDialog(initial_name="design-system.css")
@@ -778,8 +1046,13 @@ class ThemoApp(Adw.Application):
         self.set_accels_for_action("win.page-add", ["<Control>n"])
 
     def do_activate(self):
-        win = self.get_active_window() or ThemoWindow(application=self)
-        win.present()
+        win = self.get_active_window()
+        if win is None:
+            win = ThemoWindow(application=self)
+            win.present()
+            win.show_welcome()
+        else:
+            win.present()
 
 
 if __name__ == "__main__":

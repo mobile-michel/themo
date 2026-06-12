@@ -4,6 +4,21 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.9.0 — Modèles de projet, écran d'accueil et édition enrichie (12 juin 2026)
+
+**Description courte :** un nouveau projet se crée depuis un choix de modèles complets (Blog, Portfolio, Personnel, Événement, Institutionnel…) présentés dans un écran d'accueil illustré, chacun avec son style graphique et son ambiance assortis ; l'aperçu gagne la suppression de blocs au clic, le header et le footer deviennent communs à tout le site, et le sélecteur de pages disparaît au profit de la navigation par liens.
+
+**Explication commentée :**
+
+- *Modèles de projet* — sept jeux de pages complets dans `pages.py` (`PROJECT_MODELS`) : Démonstration (les trois pages historiques, dont la nav cible désormais les vraies pages), Blog (Encre & Café), Portfolio (Studio Méridien), Personnel (Camille Vasseur), Événement (Festival Interlude), Institutionnel (Commune de Valrive) et Page vide. Pages reliées entre elles par une nav commune en slugs avec `aria-current`, contenu français sans aucune classe CSS.
+- *Écran d'accueil* — au démarrage et pour « Nouveau projet » : une galerie de cartes (`Adw.Dialog` + `Gtk.FlowBox`), chacune avec une vignette SVG filaire générée en mémoire et colorée aux couleurs du modèle, le nom, le nombre de pages et une courte description ; Échap conserve le projet courant.
+- *Cinq styles graphiques et trois ambiances* — Éditorial (serif, fil de lecture), Galerie (condensé majuscules, ombres fortes), Chaleureux (rounded, pastilles), Festif (héro en dégradé, boutons pilules), Officiel (barres d'accent, tableaux bordés) ; ambiances Encre, Chaleureux et Vif en clair et sombre. Choisir un modèle applique d'office son style assorti (`MODEL_STYLES`), tout reste ajustable. La base s'adapte aux nouveaux contenus : galerie de `<figure>` en grille, titres-liens de cartes discrets.
+- *Suppression de blocs* — bouton corbeille dans l'en-tête : le bloc survolé (enfant direct de `<main>` ou section héro) se surligne en rouge, un clic le supprime ; header, nav et footer ne sont jamais candidats ; exclusif avec l'édition WYSIWYG, réarmé après chaque rechargement.
+- *Charpente commune* — `propagate_chrome()` répercute toute modification du `<header>` ou du `<footer>` (WYSIWYG ou éditeur HTML) sur toutes les pages, en recalculant `aria-current` pour chacune ; comparaison canonique (blancs et `aria-current` ignorés) pour ne jamais réécrire inutilement ; une page sans header ou footer n'en reçoit pas.
+- *Sélecteur de pages supprimé* — la page courante s'affiche en titre, on navigue par les liens de l'aperçu ; garde-fou : section « Aller à la page » (page courante cochée) dans le menu de gestion des pages, pour les pages dont le lien aurait disparu de la nav.
+
+---
+
 ## v1.8.0 — Navigation synchronisée et liens fonctionnels dans l'aperçu (11 juin 2026)
 
 **Description courte :** la navigation principale de toutes les pages est tenue à jour automatiquement lors de l'ajout, la duplication, le renommage ou la suppression d'une page, et les liens deviennent fonctionnels dans l'aperçu.

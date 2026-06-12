@@ -30,9 +30,9 @@ PAGES = {
   <nav>
     <strong>Atelier Lumen</strong>
     <ul>
-      <li><a href="#" aria-current="page">Produit</a></li>
-      <li><a href="#">Tarifs</a></li>
-      <li><a href="#">Contact</a></li>
+      <li><a href="vitrine.html" aria-current="page">Vitrine</a></li>
+      <li><a href="article.html">Article</a></li>
+      <li><a href="formulaire.html">Formulaire</a></li>
     </ul>
   </nav>
 </header>
@@ -99,9 +99,9 @@ PAGES = {
   <nav>
     <strong>Le Carnet</strong>
     <ul>
-      <li><a href="#" aria-current="page">Articles</a></li>
-      <li><a href="#">Archives</a></li>
-      <li><a href="#">À propos</a></li>
+      <li><a href="vitrine.html">Vitrine</a></li>
+      <li><a href="article.html" aria-current="page">Article</a></li>
+      <li><a href="formulaire.html">Formulaire</a></li>
     </ul>
   </nav>
 </header>
@@ -171,8 +171,9 @@ PAGES = {
   <nav>
     <strong>Support</strong>
     <ul>
-      <li><a href="#" aria-current="page">Documentation</a></li>
-      <li><a href="#">Statut</a></li>
+      <li><a href="vitrine.html">Vitrine</a></li>
+      <li><a href="article.html">Article</a></li>
+      <li><a href="formulaire.html" aria-current="page">Formulaire</a></li>
     </ul>
   </nav>
 </header>
@@ -252,6 +253,551 @@ BLANK_PAGE = """\
 """
 
 MODELS = {"Page vide": BLANK_PAGE, **PAGES}
+
+
+# ---------------------------------------------------------------------------
+# Modèles de projet — jeux de pages complets proposés à la création d'un
+# nouveau projet. Chaque page du modèle reçoit la même nav d'en-tête (liens
+# en slugs, page courante marquée aria-current) et le même pied de page.
+# ---------------------------------------------------------------------------
+
+def _nav(brand, names, current):
+    items = "".join(
+        '      <li><a href="{}.html"{}>{}</a></li>\n'.format(
+            slugify(n), ' aria-current="page"' if n == current else "", n)
+        for n in names)
+    return ("<header>\n  <nav>\n    <strong>" + brand + "</strong>\n"
+            "    <ul>\n" + items + "    </ul>\n  </nav>\n</header>\n")
+
+
+def _model(brand, footer, bodies):
+    names = list(bodies)
+    foot = f"<footer>\n  <p>{footer}</p>\n</footer>\n"
+    return {name: _nav(brand, names, name) + body + foot
+            for name, body in bodies.items()}
+
+
+_BLOG = _model("Encre &amp; Café", "© 2026 Encre &amp; Café — un billet chaque jeudi", {
+    "Accueil": """\
+<main>
+  <h1>Des mots, du papier et un peu de vapeur</h1>
+  <p>Carnet d'une rédactrice indépendante&nbsp;: l'<mark>écriture au
+     quotidien</mark>, des lectures et quelques trouvailles, publiées
+     chaque jeudi.</p>
+  <section>
+    <h2>Derniers billets</h2>
+    <article>
+      <h3><a href="article.html">Écrire tous les jours, même mal</a></h3>
+      <p><small>5 juin 2026 · 4 minutes</small></p>
+      <p>La régularité compte plus que l'inspiration. Récit d'un mois
+         d'écriture quotidienne, ratures comprises.</p>
+    </article>
+    <article>
+      <h3><a href="article.html">Relire à voix haute</a></h3>
+      <p><small>29 mai 2026 · 3 minutes</small></p>
+      <p>Le moyen le plus sûr de débusquer les phrases bancales ne
+         demande aucun outil&nbsp;: il suffit de s'écouter.</p>
+    </article>
+    <article>
+      <h3><a href="article.html">Mes trois carnets</a></h3>
+      <p><small>22 mai 2026 · 5 minutes</small></p>
+      <p>Un pour les idées, un pour les brouillons, un pour les listes.
+         Visite guidée d'un système faillible mais fidèle.</p>
+    </article>
+  </section>
+  <section>
+    <h2>Recevoir les billets</h2>
+    <form>
+      <label for="abo-email">Adresse e-mail</label>
+      <input id="abo-email" type="email" placeholder="vous@exemple.fr">
+      <button type="submit">S'abonner</button>
+    </form>
+  </section>
+</main>
+""",
+    "Article": f"""\
+<main>
+  <h1>Écrire tous les jours, même mal</h1>
+  <p>Publié le 5 juin 2026 · 4 minutes de lecture</p>
+  <hr>
+  <p>On attend souvent le bon moment pour écrire&nbsp;: le matin calme,
+     la grande idée, la tasse fumante. Le bon moment n'existe pas —
+     il n'y a que <mark>le moment où l'on s'assoit</mark>.</p>
+  <h2>La règle des dix lignes</h2>
+  <p>Dix lignes par jour, bonnes ou mauvaises. Les mauvaises s'effacent,
+     les bonnes restent, et la page n'est plus jamais blanche.</p>
+  <blockquote>
+    <p>«&nbsp;Je n'écris pas parce que j'ai des idées&nbsp;;
+       j'ai des idées parce que j'écris.&nbsp;»</p>
+  </blockquote>
+  <h2>Ce que le rituel change</h2>
+  <ul>
+    <li>la peur de commencer disparaît avec l'habitude&nbsp;;</li>
+    <li>les idées arrivent en écrivant, rarement avant&nbsp;;</li>
+    <li>relire la veille donne le point de départ du jour.</li>
+  </ul>
+  <figure>
+    <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer">
+    <figcaption>Le carnet du mois, ratures comprises.</figcaption>
+  </figure>
+  <p>La suite au prochain billet — ou sur la page
+     <a href="a-propos.html">À propos</a>.</p>
+</main>
+""",
+    "À propos": f"""\
+<main>
+  <h1>À propos</h1>
+  <figure>
+    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer">
+    <figcaption>Le bureau, le carnet, le café.</figcaption>
+  </figure>
+  <p>Je m'appelle <strong>Jeanne Borel</strong>, rédactrice indépendante.
+     Ce carnet rassemble ce que j'apprends en écrivant pour les autres —
+     et ce que je n'ose pas leur facturer.</p>
+  <h2>Questions fréquentes</h2>
+  <details>
+    <summary>Puis-je republier un billet&nbsp;?</summary>
+    <p>Oui, avec un lien vers l'original et le nom de l'autrice.</p>
+  </details>
+  <details>
+    <summary>Acceptez-vous des articles invités&nbsp;?</summary>
+    <p>Volontiers, si le sujet touche à l'écriture ou à la lecture.</p>
+  </details>
+</main>
+""",
+})
+
+
+_PORTFOLIO = _model("Studio Méridien", "© 2026 Studio Méridien — design graphique", {
+    "Accueil": """\
+<section>
+  <h1>Des identités visuelles qui tiennent la distance</h1>
+  <p>Studio Méridien conçoit des marques, des livres et des sites
+     <mark>simples, lisibles et durables</mark>.</p>
+  <p>
+    <button>Démarrer un projet</button>
+    <a href="realisations.html">Voir les réalisations</a>
+  </p>
+</section>
+<main>
+  <section>
+    <h2>Savoir-faire</h2>
+    <article>
+      <h3>Identité visuelle</h3>
+      <p>Logotypes, palettes et typographies pensés comme un système,
+         pas comme un coup d'éclat.</p>
+    </article>
+    <article>
+      <h3>Édition</h3>
+      <p>Livres, rapports et catalogues, de la maquette au bon à tirer.</p>
+    </article>
+    <article>
+      <h3>Web</h3>
+      <p>Sites sobres et rapides, construits sur un design système.</p>
+    </article>
+  </section>
+  <section>
+    <h2>Ils nous font confiance</h2>
+    <blockquote>
+      <p>«&nbsp;Le studio a donné à notre coopérative une image claire,
+         déclinée du papier à l'écran sans une fausse note.&nbsp;»</p>
+      <p><small>— Élise T., Coopérative du Val</small></p>
+    </blockquote>
+  </section>
+</main>
+""",
+    "Réalisations": f"""\
+<main>
+  <h1>Réalisations</h1>
+  <p>Une sélection de projets récents — identités, éditions et sites.</p>
+  <section>
+    <figure>
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <figcaption>Coopérative du Val — identité complète, 2026.</figcaption>
+    </figure>
+    <figure>
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <figcaption>Festival du Doc — affiches et programme, 2025.</figcaption>
+    </figure>
+    <figure>
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <figcaption>Librairie Page 12 — site et papeterie, 2025.</figcaption>
+    </figure>
+  </section>
+  <section>
+    <h2>Prestations</h2>
+    <table>
+      <thead>
+        <tr><th>Prestation</th><th>Délai indicatif</th><th>À partir de</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Identité visuelle</td><td>6 semaines</td><td>3&nbsp;800&nbsp;€</td></tr>
+        <tr><td>Édition</td><td>4 semaines</td><td>1&nbsp;900&nbsp;€</td></tr>
+        <tr><td>Site vitrine</td><td>5 semaines</td><td>2&nbsp;600&nbsp;€</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+""",
+    "Contact": """\
+<main>
+  <h1>Parlons de votre projet</h1>
+  <p>Décrivez votre besoin en quelques lignes&nbsp;; nous répondons
+     <mark>sous deux jours ouvrés</mark>.</p>
+  <form>
+    <label for="ct-nom">Nom</label>
+    <input id="ct-nom" type="text" placeholder="Votre nom">
+    <label for="ct-email">Adresse e-mail</label>
+    <input id="ct-email" type="email" placeholder="vous@exemple.fr">
+    <label for="ct-projet">Votre projet</label>
+    <textarea id="ct-projet" placeholder="Contexte, envies, délais…"></textarea>
+    <button type="submit">Envoyer</button>
+  </form>
+  <details>
+    <summary>Travaillez-vous à distance&nbsp;?</summary>
+    <p>Oui, la plupart de nos projets se mènent en visio et par écrit.</p>
+  </details>
+</main>
+""",
+})
+
+
+_PERSONNEL = _model("Camille Vasseur", "© 2026 Camille Vasseur", {
+    "Accueil": f"""\
+<main>
+  <h1>Bonjour, je suis Camille</h1>
+  <figure>
+    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer">
+    <figcaption>Quelque part entre deux randonnées.</figcaption>
+  </figure>
+  <p>Développeuse le jour, photographe le week-end. Ce site rassemble
+     <mark>ce que je fais et ce que j'aime</mark>, sans algorithme
+     entre nous.</p>
+  <h2>En ce moment</h2>
+  <ul>
+    <li>j'apprends la reliure japonaise&nbsp;;</li>
+    <li>je photographie les gares de ma région&nbsp;;</li>
+    <li>je relis <em>Le Rivage des Syrtes</em>, lentement.</li>
+  </ul>
+  <p>Mon parcours complet est sur la page
+     <a href="parcours.html">Parcours</a>.</p>
+</main>
+""",
+    "Parcours": """\
+<main>
+  <h1>Parcours</h1>
+  <h2>Expérience</h2>
+  <article>
+    <h3>Développeuse front-end — Atelier Numérique</h3>
+    <p>Depuis 2023. Interfaces accessibles pour des services publics.</p>
+  </article>
+  <article>
+    <h3>Intégratrice — Agence Horizon</h3>
+    <p>2020 – 2023. Sites éditoriaux, design systems, formation interne.</p>
+  </article>
+  <h2>Formation</h2>
+  <ul>
+    <li>Master informatique, université de Grenoble, 2020&nbsp;;</li>
+    <li>Licence d'arts appliqués, 2018.</li>
+  </ul>
+  <h2>Compétences</h2>
+  <table>
+    <thead>
+      <tr><th>Domaine</th><th>Outils</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Web</td><td>HTML, CSS, JavaScript</td></tr>
+      <tr><td>Design</td><td>Figma, Inkscape</td></tr>
+      <tr><td>Photo</td><td>Argentique, Darktable</td></tr>
+    </tbody>
+  </table>
+</main>
+""",
+    "Contact": """\
+<main>
+  <h1>Me contacter</h1>
+  <p>Pour un projet, une question ou une balade photo&nbsp;:
+     écrivez-moi, je réponds <mark>sous quelques jours</mark>.</p>
+  <form>
+    <label for="me-nom">Nom</label>
+    <input id="me-nom" type="text" placeholder="Votre nom">
+    <label for="me-email">Adresse e-mail</label>
+    <input id="me-email" type="email" placeholder="vous@exemple.fr">
+    <label for="me-message">Message</label>
+    <textarea id="me-message" placeholder="Votre message…"></textarea>
+    <button type="submit">Envoyer</button>
+  </form>
+  <h2>Ailleurs</h2>
+  <ul>
+    <li><a href="#">Mes photos</a></li>
+    <li><a href="#">Mon code</a></li>
+  </ul>
+</main>
+""",
+})
+
+
+_EVENEMENT = _model("Festival Interlude", "© 2026 Festival Interlude — Annecy", {
+    "Accueil": """\
+<section>
+  <h1>Festival Interlude — musique de chambre au bord du lac</h1>
+  <p>Trois jours de concerts <mark>du 21 au 23 août 2026</mark> à Annecy,
+     dans des lieux qui n'accueillent jamais de musique le reste de
+     l'année.</p>
+  <p>
+    <button>Réserver un pass</button>
+    <a href="programme.html">Consulter le programme</a>
+  </p>
+</section>
+<main>
+  <section>
+    <h2>L'édition 2026 en bref</h2>
+    <article>
+      <h3>Douze concerts</h3>
+      <p>Du quatuor à cordes au récital de piano, dans six lieux
+         du vieux bourg.</p>
+    </article>
+    <article>
+      <h3>Trois créations</h3>
+      <p>Des œuvres commandées à de jeunes compositrices, jouées
+         pour la première fois.</p>
+    </article>
+    <article>
+      <h3>Entrée libre le dimanche</h3>
+      <p>Le concert de clôture, sur les quais, est ouvert à toutes
+         et tous.</p>
+    </article>
+  </section>
+  <section>
+    <h2>La presse en parle</h2>
+    <blockquote>
+      <p>«&nbsp;Un festival à taille humaine, où l'on entend respirer
+         les musiciens.&nbsp;»</p>
+      <p><small>— La Gazette des Alpes, août 2025</small></p>
+    </blockquote>
+  </section>
+</main>
+""",
+    "Programme": """\
+<main>
+  <h1>Programme</h1>
+  <h2>Vendredi 21 août</h2>
+  <table>
+    <thead>
+      <tr><th>Heure</th><th>Lieu</th><th>Concert</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>18&nbsp;h</td><td>Cour du château</td><td>Quatuor Lumen — Haydn, Ravel</td></tr>
+      <tr><td>21&nbsp;h</td><td>Église Saint-Maurice</td><td>Récital d'orgue — Bach</td></tr>
+    </tbody>
+  </table>
+  <h2>Samedi 22 août</h2>
+  <table>
+    <thead>
+      <tr><th>Heure</th><th>Lieu</th><th>Concert</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>11&nbsp;h</td><td>Halle du marché</td><td>Trio Méandre — création</td></tr>
+      <tr><td>18&nbsp;h</td><td>Jardin de l'Europe</td><td>Octuor à vents — Mozart</td></tr>
+      <tr><td>21&nbsp;h</td><td>Théâtre municipal</td><td>Nuit du piano — Chopin, Liszt</td></tr>
+    </tbody>
+  </table>
+  <h2>Dimanche 23 août</h2>
+  <table>
+    <thead>
+      <tr><th>Heure</th><th>Lieu</th><th>Concert</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>17&nbsp;h</td><td>Quais du Thiou</td><td>Concert de clôture — entrée libre</td></tr>
+    </tbody>
+  </table>
+  <details>
+    <summary>Comment venir&nbsp;?</summary>
+    <p>Tous les lieux sont à moins de dix minutes à pied de la gare
+       d'Annecy. Parkings relais gratuits en périphérie.</p>
+  </details>
+</main>
+""",
+    "Inscription": """\
+<main>
+  <h1>Réserver un pass</h1>
+  <p>Les places sont limitées&nbsp;: la réservation garantit l'accès
+     à <mark>tous les concerts du pass choisi</mark>.</p>
+  <form>
+    <fieldset>
+      <legend>Vos coordonnées</legend>
+      <label for="ins-nom">Nom complet</label>
+      <input id="ins-nom" type="text" placeholder="Marie Dupont">
+      <label for="ins-email">Adresse e-mail</label>
+      <input id="ins-email" type="email" placeholder="marie@exemple.fr">
+    </fieldset>
+    <fieldset>
+      <legend>Votre pass</legend>
+      <label for="ins-pass">Formule</label>
+      <select id="ins-pass">
+        <option>Pass 3 jours — 75&nbsp;€</option>
+        <option>Pass week-end — 55&nbsp;€</option>
+        <option>Concert à l'unité — 18&nbsp;€</option>
+      </select>
+      <p>
+        <label><input type="checkbox" checked> Recevoir le programme détaillé</label><br>
+        <label><input type="radio" name="tarif" checked> Plein tarif</label><br>
+        <label><input type="radio" name="tarif"> Tarif réduit (justificatif demandé)</label>
+      </p>
+    </fieldset>
+    <button type="submit">Valider la réservation</button>
+  </form>
+  <details>
+    <summary>Puis-je annuler&nbsp;?</summary>
+    <p>Oui, remboursement intégral jusqu'à sept jours avant le festival.</p>
+  </details>
+</main>
+""",
+})
+
+
+_INSTITUTIONNEL = _model("Commune de Valrive", "© 2026 Commune de Valrive", {
+    "Accueil": """\
+<main>
+  <h1>Bienvenue à Valrive</h1>
+  <p>Toutes vos démarches et l'actualité de la commune,
+     <mark>au même endroit</mark>.</p>
+  <section>
+    <h2>Démarches les plus demandées</h2>
+    <article>
+      <h3>État civil</h3>
+      <p>Actes de naissance, mariage et décès, livret de famille.</p>
+    </article>
+    <article>
+      <h3>Urbanisme</h3>
+      <p>Permis de construire, déclarations de travaux, cadastre.</p>
+    </article>
+    <article>
+      <h3>Vie scolaire</h3>
+      <p>Inscriptions à l'école, cantine et accueil périscolaire.</p>
+    </article>
+  </section>
+  <section>
+    <h2>Horaires de la mairie</h2>
+    <table>
+      <thead>
+        <tr><th>Jour</th><th>Matin</th><th>Après-midi</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Lundi – vendredi</td><td>8&nbsp;h&nbsp;30 – 12&nbsp;h</td><td>13&nbsp;h&nbsp;30 – 17&nbsp;h</td></tr>
+        <tr><td>Samedi</td><td>9&nbsp;h – 12&nbsp;h</td><td>fermé</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+""",
+    "Services": """\
+<main>
+  <h1>Services municipaux</h1>
+  <h2>État civil et citoyenneté</h2>
+  <p>Délivrance des actes, recensement citoyen, inscriptions sur les
+     listes électorales. La plupart des demandes se font en ligne ou
+     au guichet, sans rendez-vous.</p>
+  <h2>Enfance et écoles</h2>
+  <p>Inscriptions scolaires, restauration et accueil périscolaire.
+     Les tarifs suivent le quotient familial.</p>
+  <h2>Travaux et urbanisme</h2>
+  <p>Dépôt des permis et déclarations préalables, consultation du plan
+     local d'urbanisme.</p>
+  <details>
+    <summary>Quels documents pour un acte de naissance&nbsp;?</summary>
+    <p>Une pièce d'identité suffit pour une demande vous concernant.</p>
+  </details>
+  <details>
+    <summary>Quel délai pour un permis de construire&nbsp;?</summary>
+    <p>Deux à trois mois selon la zone, à compter du dossier complet.</p>
+  </details>
+</main>
+""",
+    "Actualités": """\
+<main>
+  <h1>Actualités</h1>
+  <article>
+    <h2>Réfection de la rue des Tilleuls</h2>
+    <p><small>Publié le 8 juin 2026</small></p>
+    <p>Les travaux commencent le 22 juin pour six semaines. La
+       circulation sera alternée&nbsp;; l'accès des riverains est
+       maintenu.</p>
+  </article>
+  <hr>
+  <article>
+    <h2>Inscriptions scolaires ouvertes</h2>
+    <p><small>Publié le 26 mai 2026</small></p>
+    <p>Les inscriptions pour la rentrée 2026 sont ouvertes jusqu'au
+       10 juillet, en mairie ou en ligne.</p>
+  </article>
+  <hr>
+  <article>
+    <h2>Marché des producteurs</h2>
+    <p><small>Publié le 12 mai 2026</small></p>
+    <p>Le marché reprend chaque dimanche matin sur la place de l'Église,
+       d'avril à octobre.</p>
+  </article>
+</main>
+""",
+    "Contact": """\
+<main>
+  <h1>Contacter la mairie</h1>
+  <p>Mairie de Valrive — 1&nbsp;place de la République, 74&nbsp;000 Valrive<br>
+     Téléphone&nbsp;: 04&nbsp;50&nbsp;00&nbsp;00&nbsp;00</p>
+  <form>
+    <label for="ma-nom">Nom</label>
+    <input id="ma-nom" type="text" placeholder="Votre nom">
+    <label for="ma-email">Adresse e-mail</label>
+    <input id="ma-email" type="email" placeholder="vous@exemple.fr">
+    <label for="ma-objet">Service concerné</label>
+    <select id="ma-objet">
+      <option>État civil</option>
+      <option>Urbanisme</option>
+      <option>Vie scolaire</option>
+      <option>Autre demande</option>
+    </select>
+    <label for="ma-message">Message</label>
+    <textarea id="ma-message" placeholder="Votre demande…"></textarea>
+    <button type="submit">Envoyer</button>
+  </form>
+</main>
+""",
+})
+
+
+PROJECT_MODELS = {
+    "Démonstration": PAGES,
+    "Blog": _BLOG,
+    "Portfolio": _PORTFOLIO,
+    "Personnel": _PERSONNEL,
+    "Événement": _EVENEMENT,
+    "Institutionnel": _INSTITUTIONNEL,
+    "Page vide": {
+        "Accueil": _nav("Mon site", ["Accueil"], "Accueil") + """\
+<main>
+  <h1>Nouvelle page</h1>
+  <p>Le contenu de cette page est à éditer.</p>
+</main>
+<footer>
+  <p>© 2026</p>
+</footer>
+"""},
+}
+
+MODEL_DESCRIPTIONS = {
+    "Démonstration": "Vitrine, article et formulaire : tous les éléments"
+                     " du design système passés en revue.",
+    "Blog": "Un carnet de billets : accueil, page article et À propos.",
+    "Portfolio": "La vitrine d'un studio : savoir-faire, réalisations"
+                 " en galerie et contact.",
+    "Personnel": "Un site à son nom : présentation, parcours et contact.",
+    "Événement": "Festival ou conférence : présentation, programme"
+                 " et réservation.",
+    "Institutionnel": "Commune ou organisme : démarches, services,"
+                      " actualités et contact.",
+    "Page vide": "Une seule page minimale, pour composer librement.",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +966,68 @@ def nav_set_links(body, names, current=None):
             slugify(n), ' aria-current="page"' if n == current else "", n)
         for n in names)
     return body[:start] + "\n" + items + "    " + body[end:]
+
+
+# ---------------------------------------------------------------------------
+# Charpente commune : <header> et <footer> sont partagés par tout le site.
+# Toute modification sur une page est répercutée sur les autres, en
+# préservant le lien aria-current propre à chaque page.
+# ---------------------------------------------------------------------------
+
+_HEADER_RE = re.compile(r"<header\b[^>]*>.*?</header>", re.S | re.I)
+_FOOTER_RE = re.compile(r"<footer\b[^>]*>.*?</footer>", re.S | re.I)
+
+
+def _chrome(body):
+    """Premier <header> et dernier <footer> de la page (None si absent)."""
+    headers = _HEADER_RE.findall(body)
+    footers = _FOOTER_RE.findall(body)
+    return (headers[0] if headers else None,
+            footers[-1] if footers else None)
+
+
+def _strip_current(html):
+    return re.sub(r'\s*aria-current="page"', "", html)
+
+
+def _mark_current(header, name):
+    """aria-current sur le lien vers la page `name`, retiré des autres."""
+    header = _strip_current(header)
+    href = re.escape(f"{slugify(name)}.html")
+    return re.sub(r'(<a\b[^>]*?href="' + href + '")',
+                  r'\1 aria-current="page"', header, count=1)
+
+
+def _chrome_norm(html):
+    """Forme canonique pour comparer : sans aria-current ni blancs variables
+    (l'édition WYSIWYG renvoie un HTML aux espaces normalisés)."""
+    return " ".join(_strip_current(html).split())
+
+
+def propagate_chrome(pages, source):
+    """Répercute l'en-tête et le pied de la page `source` sur les autres.
+
+    Une page sans <header> ou sans <footer> n'en reçoit pas : l'absence est
+    respectée comme un choix. Renvoie True si au moins une page a changé.
+    """
+    src_header, src_footer = _chrome(pages[source])
+    changed = False
+    for name, body in pages.items():
+        if name == source:
+            continue
+        header, footer = _chrome(body)
+        if (src_header and header
+                and _chrome_norm(header) != _chrome_norm(src_header)):
+            marked = _mark_current(src_header, name)
+            body = _HEADER_RE.sub(lambda _m: marked, body, count=1)
+            changed = True
+        if (src_footer and footer
+                and _chrome_norm(footer) != _chrome_norm(src_footer)):
+            i = body.rfind(footer)
+            body = body[:i] + src_footer + body[i + len(footer):]
+            changed = True
+        pages[name] = body
+    return changed
 
 
 def insert_block(body: str, name: str) -> str:

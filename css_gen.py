@@ -101,6 +101,72 @@ SEMANTIC_TEMPLATES = {
                      _v("secondary", 700),
                      _v("secondary", 300), _v("secondary", 800)),
     },
+    # Papier et encre : fond légèrement teinté, accents profonds — pensé
+    # pour la lecture longue (style « Éditorial », modèle Blog).
+    "Encre": {
+        "light": _sem(_v("neutral", 50), "#ffffff",
+                      _v("neutral", 900), _v("neutral", 600),
+                      _v("neutral", 200), _v("neutral", 400),
+                      _v("primary", 800), _v("primary", 900),
+                      _v("primary", 100), "#ffffff",
+                      _v("primary", 800), _v("primary", 900),
+                      _v("primary", 500), _v("neutral", 100),
+                      _v("secondary", 100),
+                      _v("secondary", 700), _v("secondary", 100)),
+        "dark": _sem(_v("neutral", 900), _v("neutral", 800),
+                     _v("neutral", 200), _v("neutral", 400),
+                     _v("neutral", 700), _v("neutral", 600),
+                     _v("primary", 300), _v("primary", 200),
+                     _v("primary", 900), _v("neutral", 900),
+                     _v("primary", 300), _v("primary", 200),
+                     _v("primary", 500), _v("neutral", 800),
+                     _v("secondary", 800),
+                     _v("secondary", 400), _v("secondary", 900)),
+    },
+    # Fond teinté par la couleur secondaire, accents francs de la primaire —
+    # accueillant (style « Chaleureux », modèle Personnel).
+    "Chaleureux": {
+        "light": _sem(_v("secondary", 50), "#ffffff",
+                      _v("neutral", 800), _v("neutral", 500),
+                      _v("secondary", 100), _v("secondary", 200),
+                      _v("primary", 600), _v("primary", 700),
+                      _v("primary", 100), "#ffffff",
+                      _v("primary", 700), _v("primary", 800),
+                      _v("primary", 300), _v("secondary", 100),
+                      _v("secondary", 200),
+                      _v("secondary", 600), _v("secondary", 100)),
+        "dark": _sem(_v("neutral", 900), _v("neutral", 800),
+                     _v("neutral", 200), _v("neutral", 400),
+                     _v("neutral", 700), _v("neutral", 600),
+                     _v("primary", 400), _v("primary", 300),
+                     _v("primary", 900), _v("neutral", 900),
+                     _v("primary", 300), _v("primary", 200),
+                     _v("primary", 500), _v("neutral", 800),
+                     _v("secondary", 800),
+                     _v("secondary", 400), _v("secondary", 900)),
+    },
+    # Couleurs franches, surfaces teintées, focus sur la secondaire —
+    # énergique (style « Festif », modèle Événement).
+    "Vif": {
+        "light": _sem("#ffffff", _v("primary", 50),
+                      _v("neutral", 900), _v("neutral", 600),
+                      _v("primary", 200), _v("primary", 300),
+                      _v("primary", 500), _v("primary", 600),
+                      _v("primary", 100), "#ffffff",
+                      _v("primary", 600), _v("primary", 700),
+                      _v("secondary", 400), _v("primary", 50),
+                      _v("secondary", 200),
+                      _v("secondary", 500), _v("secondary", 100)),
+        "dark": _sem(_v("neutral", 900), _v("neutral", 800),
+                     _v("neutral", 100), _v("neutral", 400),
+                     _v("neutral", 700), _v("neutral", 600),
+                     _v("primary", 400), _v("primary", 300),
+                     _v("primary", 900), _v("neutral", 900),
+                     _v("primary", 300), _v("primary", 200),
+                     _v("secondary", 500), _v("neutral", 800),
+                     _v("secondary", 700),
+                     _v("secondary", 400), _v("secondary", 900)),
+    },
 }
 
 
@@ -230,6 +296,36 @@ article {
 
 article > :first-child { margin-top: 0; }
 article > :last-child { margin-bottom: 0; }
+
+/* Titre-lien d'une carte (liste de billets, d'actualités…) : le titre reste
+   un titre, le lien ne se révèle qu'au survol. */
+article :is(h2, h3, h4) a {
+  color: inherit;
+  text-decoration: none;
+}
+
+article :is(h2, h3, h4) a:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+/* Une section contenant plusieurs <figure> devient une galerie */
+section:has(> figure) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--card-min), 100%), 1fr));
+  gap: var(--space-4);
+}
+
+section:has(> figure) > h2,
+section:has(> figure) > p { grid-column: 1 / -1; }
+
+section:has(> figure) > figure { margin: 0; }
+
+section:has(> figure) > figure img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
 
 /* ---- Typographie ------------------------------------------------------ */
 
@@ -457,6 +553,8 @@ body > header nav a { border-radius: var(--radius-full); }
 
 body > header nav a:hover,
 body > header nav a[aria-current] { background: var(--accent-soft); }
+
+section:has(> figure) > figure img { border-radius: var(--radius-lg); }
 """,
     "Classique": """\
 /* ---- Variante : Classique ---------------------------------------------- */
@@ -489,6 +587,15 @@ body > header nav a:hover { text-decoration: underline; }
 
 body > header nav a[aria-current] {
   box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Figures encadrées comme des estampes */
+figcaption { font-style: italic; }
+
+section:has(> figure) > figure {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: var(--space-2);
 }
 """,
     "Minimal": """\
@@ -527,6 +634,213 @@ body > header nav a[aria-current] {
   text-decoration: underline;
   text-underline-offset: 0.35em;
   text-decoration-color: var(--accent);
+}
+
+img, video { border-radius: 0; }
+""",
+    "Éditorial": """\
+/* ---- Variante : Éditorial ----------------------------------------------- */
+
+a { text-decoration: underline; text-underline-offset: 0.15em; }
+
+h1, h2, h3 { font-weight: 600; }
+
+h1 + p { font-style: italic; }
+
+/* Les listes d'articles redeviennent un fil de lecture, sans cartes */
+section:has(> article) { grid-template-columns: 1fr; gap: 0; }
+
+article {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--space-6) 0;
+}
+
+article:last-of-type { border-bottom: none; }
+
+blockquote {
+  background: none;
+  border-inline-start: 2px solid var(--accent-2);
+  font-style: italic;
+}
+
+hr {
+  width: var(--space-16);
+  margin-inline: auto;
+  border-top: 2px solid var(--border-strong);
+}
+
+body > header nav a:hover { text-decoration: underline; }
+
+body > header nav a[aria-current] {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 0.35em;
+  text-decoration-color: var(--accent);
+}
+""",
+    "Galerie": """\
+/* ---- Variante : Galerie -------------------------------------------------- */
+
+h1, h2 { text-transform: uppercase; letter-spacing: 0.02em; }
+
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+img, video { border-radius: 0; }
+
+figure img { box-shadow: var(--shadow-2); }
+
+figcaption {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--text-xs);
+}
+
+section:has(> figure) { gap: var(--space-2); }
+
+article { border: none; border-radius: 0; box-shadow: var(--shadow-3); }
+
+button, input[type="submit"], input[type="button"] {
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+body > section { border-bottom: 4px solid var(--accent); }
+
+body > header nav a {
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--text-sm);
+}
+
+body > header nav a[aria-current] { box-shadow: inset 0 -2px 0 var(--accent); }
+""",
+    "Chaleureux": """\
+/* ---- Variante : Chaleureux ----------------------------------------------- */
+
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h2 { color: var(--accent); }
+
+article {
+  border: none;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
+}
+
+img, video { border-radius: var(--radius-lg); }
+
+figcaption { text-align: center; font-style: italic; }
+
+blockquote {
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--accent-2-soft);
+}
+
+button, input[type="submit"], input[type="button"] {
+  border-radius: var(--radius-full);
+  padding-inline: var(--space-6);
+}
+
+details { border-radius: var(--radius-lg); }
+
+body > header nav a { border-radius: var(--radius-full); }
+
+body > header nav a:hover,
+body > header nav a[aria-current] { background: var(--accent-soft); }
+
+body > footer { border-top: none; }
+""",
+    "Festif": """\
+/* ---- Variante : Festif ----------------------------------------------------- */
+
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1 { letter-spacing: -0.02em; }
+
+h2 { color: var(--accent); }
+
+mark { background: var(--accent-2-soft); }
+
+body > section {
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent-2-soft));
+  border-bottom: none;
+}
+
+article {
+  border: 2px solid var(--accent-soft);
+  box-shadow: none;
+}
+
+thead th {
+  background: var(--accent-soft);
+  border-bottom: none;
+}
+
+button, input[type="submit"], input[type="button"] {
+  border-radius: var(--radius-full);
+  padding-inline: var(--space-6);
+  box-shadow: var(--shadow-2);
+}
+
+button:hover, input[type="submit"]:hover, input[type="button"]:hover {
+  box-shadow: var(--shadow-3);
+}
+
+details { border: 2px solid var(--accent-soft); border-radius: var(--radius-lg); }
+
+body > header nav a { border-radius: var(--radius-full); }
+
+body > header nav a[aria-current] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+""",
+    "Officiel": """\
+/* ---- Variante : Officiel --------------------------------------------------- */
+
+a { text-decoration: underline; }
+
+h2 {
+  border-inline-start: 4px solid var(--accent);
+  padding-inline-start: var(--space-3);
+}
+
+article {
+  border-radius: var(--radius-sm);
+  border-top: 3px solid var(--accent);
+  box-shadow: none;
+}
+
+th, td { border: 1px solid var(--border); }
+
+thead th { background: var(--code-background); }
+
+button, input[type="submit"], input[type="button"] {
+  border-radius: var(--radius-sm);
+}
+
+details { border-radius: var(--radius-sm); }
+
+body > header { border-bottom: 3px solid var(--accent); }
+
+body > header nav a { border-radius: 0; }
+
+body > header nav a[aria-current] { box-shadow: inset 0 -3px 0 var(--accent); }
+
+body > footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  text-align: start;
 }
 """,
 }

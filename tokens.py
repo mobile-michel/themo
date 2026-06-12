@@ -104,6 +104,53 @@ STYLE_PRESETS = {
         "spacing_base": 5.0, "radius": 0, "shadow_alpha": 0,
         "container": "Étroit", "density": "Aéré", "card_min": 16,
     },
+    # Styles pensés pour les modèles de projet (Blog, Portfolio, Personnel,
+    # Événement, Institutionnel) — utilisables bien sûr avec toute page.
+    "Éditorial": {
+        "primary": "#1e3a5f", "secondary": "#c2410c",
+        "semantic_template": "Encre",
+        "font_heading": "Old Style", "font_body": "Transitional",
+        "font_mono": "Monospace Slab Serif",
+        "base_size": 18, "ratio": 1.2, "leading": 1.75,
+        "spacing_base": 4.0, "radius": 2, "shadow_alpha": 4,
+        "container": "Étroit", "density": "Aéré", "card_min": 16,
+    },
+    "Galerie": {
+        "primary": "#18181b", "secondary": "#e11d48",
+        "semantic_template": "Contrasté",
+        "font_heading": "Industrial", "font_body": "Neo-Grotesque",
+        "font_mono": "Monospace Code",
+        "base_size": 16, "ratio": 1.333, "leading": 1.6,
+        "spacing_base": 4.0, "radius": 0, "shadow_alpha": 18,
+        "container": "Large", "density": "Normal", "card_min": 18,
+    },
+    "Chaleureux": {
+        "primary": "#ea580c", "secondary": "#0d9488",
+        "semantic_template": "Chaleureux",
+        "font_heading": "Rounded Sans", "font_body": "Humanist",
+        "font_mono": "Monospace Code",
+        "base_size": 17, "ratio": 1.25, "leading": 1.7,
+        "spacing_base": 4.5, "radius": 14, "shadow_alpha": 10,
+        "container": "Étroit", "density": "Normal", "card_min": 14,
+    },
+    "Festif": {
+        "primary": "#7c3aed", "secondary": "#db2777",
+        "semantic_template": "Vif",
+        "font_heading": "Industrial", "font_body": "Neo-Grotesque",
+        "font_mono": "Monospace Code",
+        "base_size": 16, "ratio": 1.414, "leading": 1.6,
+        "spacing_base": 4.0, "radius": 16, "shadow_alpha": 16,
+        "container": "Moyen", "density": "Aéré", "card_min": 14,
+    },
+    "Officiel": {
+        "primary": "#1e3a8a", "secondary": "#991b1b",
+        "semantic_template": "Neutre",
+        "font_heading": "Geometric Humanist", "font_body": "Classical Humanist",
+        "font_mono": "Monospace Code",
+        "base_size": 16, "ratio": 1.2, "leading": 1.65,
+        "spacing_base": 4.0, "radius": 4, "shadow_alpha": 6,
+        "container": "Moyen", "density": "Normal", "card_min": 14,
+    },
 }
 
 
