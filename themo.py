@@ -10,6 +10,8 @@ design-system.css et de pages HTML, sans la moindre classe CSS.
 import json
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +30,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 gi.require_version("WebKit", "6.0")
 gi.require_version("GtkSource", "5")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, GtkSource, WebKit  # noqa: E402
+from gi.repository import (Adw, Gdk, Gio, GLib, Gtk, GtkSource,  # noqa: E402
+                           Pango, WebKit)
 
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
@@ -38,6 +41,7 @@ from pages import (MODELS, PROJECT_MODELS, MODEL_DESCRIPTIONS,  # noqa: E402
                    nav_add_link, nav_remove_link, nav_rename_link,
                    nav_set_links, wrap_preview, wrap_export)
 from project import Project, slugify  # noqa: E402
+import openverse  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
 
@@ -154,6 +158,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._dirty = False
         self._loaded_page = None  # page actuellement rendue dans l'aperçu
         self._current_page = None  # page affichée et éditée
+        self._illustrate_token = None    # invalidation des illustrations
+        self._image_search_token = None  # invalidation des recherches
 
         self._restore_window_state()
         self.connect("close-request", self._save_window_state)
@@ -398,6 +404,49 @@ class ThemoWindow(Adw.ApplicationWindow):
             delete_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
             WebKit.UserScriptInjectionTime.END, None, None))
 
+        # Mode « remplacer une image » : survol = surlignage de l'image,
+        # clic = envoi de son indice et de ses mots-clés à l'application.
+        ucm.register_script_message_handler("imagePicked", None)
+        ucm.connect("script-message-received::imagePicked",
+                    self._on_image_picked)
+        image_js = """
+        (function () {
+          let armed = false, cur = null;
+          function clear() {
+            if (cur) { cur.style.outline = ''; cur.style.cursor = ''; }
+            cur = null;
+          }
+          document.addEventListener('mouseover', function (ev) {
+            if (!armed) return;
+            clear();
+            if (ev.target.tagName === 'IMG') {
+              cur = ev.target;
+              cur.style.outline = '3px solid #2563eb';
+              cur.style.cursor = 'pointer';
+            }
+          });
+          document.addEventListener('click', function (ev) {
+            if (!armed) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (ev.target.tagName !== 'IMG') return;
+            const imgs = Array.from(document.querySelectorAll('img'));
+            const index = imgs.indexOf(ev.target);
+            const keywords = ev.target.getAttribute('data-keywords') || '';
+            clear();
+            window.webkit.messageHandlers.imagePicked.postMessage(
+              JSON.stringify({index: index, keywords: keywords}));
+          }, true);
+          window._themoImagePick = function (on) {
+            armed = on;
+            if (!on) clear();
+          };
+        })();
+        """
+        ucm.add_script(WebKit.UserScript.new(
+            image_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
+            WebKit.UserScriptInjectionTime.END, None, None))
+
         self.webview = WebKit.WebView(user_content_manager=ucm)
         self.webview.set_vexpand(True)
         self.webview.connect("load-changed", self._on_load_changed)
@@ -462,6 +511,11 @@ class ThemoWindow(Adw.ApplicationWindow):
             tooltip_text="Supprimer des blocs en cliquant dans l'aperçu")
         self.delete_toggle.connect("toggled", self._on_delete_toggled)
 
+        self.image_toggle = Gtk.ToggleButton(
+            icon_name="image-x-generic-symbolic",
+            tooltip_text="Remplacer une image en cliquant dans l'aperçu")
+        self.image_toggle.connect("toggled", self._on_image_toggled)
+
         project_menu = Gio.Menu()
         sect = Gio.Menu()
         sect.append("Nouveau projet", "win.project-new")
@@ -487,6 +541,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         header.pack_start(self.dark_toggle)
         header.pack_start(self.wysiwyg_toggle)
         header.pack_start(self.delete_toggle)
+        header.pack_start(self.image_toggle)
         header.pack_start(self.editor_toggle)
         header.pack_end(burger)
         header.pack_end(export)
@@ -596,6 +651,8 @@ class ThemoWindow(Adw.ApplicationWindow):
                 self.editor_toggle.set_active(False)
             if self.delete_toggle.get_active():
                 self.delete_toggle.set_active(False)
+            if self.image_toggle.get_active():
+                self.image_toggle.set_active(False)
             self._set_design_mode(True)
             self.toasts.add_toast(Adw.Toast(
                 title="Édition du texte activée — cliquez dans l'aperçu"))
@@ -607,6 +664,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         if btn.get_active():
             if self.wysiwyg_toggle.get_active():
                 self.wysiwyg_toggle.set_active(False)
+            if self.image_toggle.get_active():
+                self.image_toggle.set_active(False)
             self._run_js("window._themoBlockDelete(true);")
             self.toasts.add_toast(Adw.Toast(
                 title="Cliquez un bloc dans l'aperçu pour le supprimer"))
@@ -623,6 +682,154 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._touch()
         self._load_page_into_editor()
         self.toasts.add_toast(Adw.Toast(title="Bloc supprimé"))
+
+    # -- Remplacement d'images (Openverse) ------------------------------------
+
+    def _on_image_toggled(self, btn):
+        if btn.get_active():
+            if self.wysiwyg_toggle.get_active():
+                self.wysiwyg_toggle.set_active(False)
+            if self.delete_toggle.get_active():
+                self.delete_toggle.set_active(False)
+            self._run_js("window._themoImagePick(true);")
+            self.toasts.add_toast(Adw.Toast(
+                title="Cliquez une image dans l'aperçu pour la remplacer"))
+        else:
+            self._run_js("window._themoImagePick(false);")
+
+    def _on_image_picked(self, _ucm, value):
+        try:
+            info = json.loads(value.to_string())
+        except ValueError:
+            return
+        self._image_search_dialog(int(info.get("index", -1)),
+                                  info.get("keywords", ""))
+
+    def _replace_page_image(self, page, index, data, ctype, title):
+        """Embarque l'image (data URI) à la place de la `index`-ième <img>."""
+        if page not in self.project.pages:
+            return
+        self.project.pages[page] = openverse.replace_img(
+            self.project.pages[page], index,
+            openverse.data_uri(data, ctype), title or None)
+        self._touch()
+        if page == self._current_page_name():
+            self._load_page_into_editor()
+            self._loaded_page = None  # forcer un rechargement de l'aperçu
+            self._schedule_refresh()
+
+    def _image_search_dialog(self, index, keywords):
+        if index < 0 or self._loaded_page not in self.project.pages:
+            return
+        page = self._loaded_page
+        dialog = Adw.Dialog(title="Remplacer l'image",
+                            content_width=760, content_height=560)
+
+        entry = Gtk.SearchEntry(text=keywords,
+                                placeholder_text="Mots-clés (anglais conseillé)")
+        entry.set_hexpand(True)
+        status = Gtk.Label()
+        status.add_css_class("dim-label")
+        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE,
+                           homogeneous=True, column_spacing=12,
+                           row_spacing=12, margin_top=12, margin_bottom=12,
+                           margin_start=12, margin_end=12,
+                           valign=Gtk.Align.START,
+                           min_children_per_line=2, max_children_per_line=3)
+        results = []  # (octets, type MIME, titre), alignés sur les cartes
+
+        def add_card(token, data, ctype, title):
+            if token is not self._image_search_token:
+                return False
+            try:
+                texture = Gdk.Texture.new_from_bytes(GLib.Bytes.new(data))
+            except GLib.Error:
+                return False
+            pic = Gtk.Picture.new_for_paintable(texture)
+            pic.set_content_fit(Gtk.ContentFit.COVER)
+            pic.set_size_request(200, 140)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4,
+                          margin_top=8, margin_bottom=8,
+                          margin_start=8, margin_end=8)
+            box.append(pic)
+            label = Gtk.Label(label=title or "Sans titre")
+            label.add_css_class("caption")
+            label.set_ellipsize(Pango.EllipsizeMode.END)
+            label.set_max_width_chars(24)
+            box.append(label)
+            child = Gtk.FlowBoxChild(child=box)
+            child.add_css_class("card")
+            child.add_css_class("activatable")
+            results.append((data, ctype, title))
+            flow.append(child)
+            return False
+
+        def search_done(token, found, error):
+            if token is not self._image_search_token:
+                return False
+            if error:
+                status.set_text("Recherche impossible — êtes-vous en ligne ?")
+            elif not found:
+                status.set_text("Aucun résultat CC0 pour ces mots-clés")
+            else:
+                status.set_text(f"{found} photos CC0 — cliquez pour remplacer")
+            return False
+
+        def do_search(*_args):
+            terms = entry.get_text().strip()
+            if not terms:
+                status.set_text("Saisissez des mots-clés puis Entrée")
+                return
+            token = self._image_search_token = object()
+            results.clear()
+            flow.remove_all()
+            status.set_text("Recherche…")
+
+            def worker():
+                try:
+                    found = openverse.search(terms, count=9)
+                except Exception:
+                    GLib.idle_add(search_done, token, 0, True)
+                    return
+                shown = 0
+                for n, r in enumerate(found):
+                    if token is not self._image_search_token:
+                        return  # nouvelle recherche lancée entre-temps
+                    if n:
+                        time.sleep(0.4)  # ménager la limite de débit
+                    try:
+                        data, ctype = openverse.fetch(r["thumbnail"])
+                    except Exception:
+                        continue
+                    shown += 1
+                    GLib.idle_add(add_card, token, data, ctype, r["title"])
+                GLib.idle_add(search_done, token, shown, False)
+            threading.Thread(target=worker, daemon=True).start()
+        entry.connect("activate", do_search)
+
+        def activated(_flow, child):
+            data, ctype, title = results[child.get_index()]
+            dialog.close()
+            self._replace_page_image(page, index, data, ctype, title)
+            self.toasts.add_toast(Adw.Toast(title="Image remplacée"))
+        flow.connect("child-activated", activated)
+
+        top = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                      margin_top=8, margin_start=12, margin_end=12)
+        top.append(entry)
+        top.append(status)
+        scroller = Gtk.ScrolledWindow(child=flow)
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_vexpand(True)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.append(top)
+        content.append(scroller)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(content)
+        dialog.set_child(view)
+        dialog.present(self)
+        do_search()  # recherche immédiate avec les mots-clés de l'image
 
     def _on_decide_policy(self, _webview, decision, dtype):
         """Suivre les liens internes dans l'aperçu, sans fichiers réels.
@@ -660,6 +867,8 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._set_design_mode(True)
         if self.delete_toggle.get_active():
             self._run_js("window._themoBlockDelete(true);")
+        if self.image_toggle.get_active():
+            self._run_js("window._themoImagePick(true);")
 
     def _on_wysiwyg_edit(self, _ucm, value):
         # cible : la page rendue dans l'aperçu (et non la sélection courante,
@@ -933,20 +1142,31 @@ class ThemoWindow(Adw.ApplicationWindow):
         dialog = Adw.Dialog(title=heading,
                             content_width=780, content_height=620)
 
+        illustrate = Gtk.CheckButton(
+            label="Illustrer avec des photos libres de droits (Openverse)")
+        illustrate.set_active(True)
+        illustrate.set_tooltip_text(
+            "Remplace les images de remplissage par des photos CC0 "
+            "téléchargées — décochez pour rester hors ligne")
+
         def activated(_flow, child):
             dialog.close()
-            self._create_project_from_model(names[child.get_index()])
+            self._create_project_from_model(names[child.get_index()],
+                                            illustrate.get_active())
         flow.connect("child-activated", activated)
 
         scroller = Gtk.ScrolledWindow(child=flow)
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        bar = Gtk.ActionBar()
+        bar.pack_start(illustrate)
         view = Adw.ToolbarView()
         view.add_top_bar(Adw.HeaderBar())
         view.set_content(scroller)
+        view.add_bottom_bar(bar)
         dialog.set_child(view)
         dialog.present(self)
 
-    def _create_project_from_model(self, name):
+    def _create_project_from_model(self, name, illustrate=False):
         cfg = Config()
         style = MODEL_STYLES.get(name)
         if style:
@@ -956,6 +1176,61 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._adopt_project(Project(cfg=cfg, pages=PROJECT_MODELS[name]))
         self.toasts.add_toast(Adw.Toast(
             title=f"Nouveau projet — modèle « {name} »"))
+        if illustrate:
+            self._illustrate_project()
+
+    def _illustrate_project(self):
+        """Remplace en arrière-plan les placeholders par des photos CC0.
+
+        Hors ligne ou en cas d'échec, les placeholders SVG restent : la
+        création de projet n'est jamais bloquante.
+        """
+        tasks = []
+        for page, body in self.project.pages.items():
+            for _i, keywords in openverse.placeholder_slots(body):
+                tasks.append((page, keywords))
+        if not tasks:
+            return
+        token = self._illustrate_token = object()
+        self.toasts.add_toast(Adw.Toast(
+            title="Recherche d'illustrations libres (Openverse)…"))
+
+        def apply(page, keywords, data, ctype, title):
+            # cible le premier placeholder restant avec ces mots-clés :
+            # robuste aux éditions survenues pendant le téléchargement
+            if self._illustrate_token is not token:
+                return False
+            body = self.project.pages.get(page)
+            if body is None:
+                return False
+            for i, kw in openverse.placeholder_slots(body):
+                if kw == keywords:
+                    self._replace_page_image(page, i, data, ctype, title)
+                    break
+            return False
+
+        def worker():
+            cache = {}
+            for n, (page, keywords) in enumerate(tasks):
+                if n:
+                    time.sleep(1.5)  # limite de débit anonyme d'Openverse
+                try:
+                    if keywords not in cache:
+                        cache[keywords] = openverse.search(keywords, count=8)
+                except Exception:
+                    continue  # réseau indisponible : placeholder conservé
+                # certaines vignettes sont mortes (HTTP 424) : on essaie
+                # les résultats suivants jusqu'à en obtenir une
+                while cache[keywords]:
+                    result = cache[keywords].pop(0)
+                    try:
+                        data, ctype = openverse.fetch(result["thumbnail"])
+                    except Exception:
+                        continue
+                    GLib.idle_add(apply, page, keywords, data, ctype,
+                                  result["title"])
+                    break
+        threading.Thread(target=worker, daemon=True).start()
 
     def show_welcome(self):
         self._choose_model("Bienvenue dans Thémo — choisissez un modèle")

@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.11.0 — Photos libres de droits via Openverse (12 juin 2026)
+
+**Description courte :** à la création d'un projet, les images de remplissage sont remplacées par des photos CC0 trouvées sur Openverse selon des mots-clés propres à chaque modèle (case décochable dans l'écran d'accueil), et un mode « remplacer une image » permet ensuite d'en changer au clic, avec recherche par mots-clés.
+
+**Explication commentée :**
+
+- *Module `openverse.py`* — recherche d'images via l'API Openverse, filtrée licence CC0 (utilisables sans attribution) ; les photos sont téléchargées puis embarquées en data URI : l'aperçu ne référence jamais de contenu distant, la promesse du bac à sable WebKit désactivé tient toujours. Retentative avec backoff sur la limite de débit (HTTP 429), espacement des requêtes, et bascule au résultat suivant quand une vignette est morte (HTTP 424, constaté en conditions réelles).
+- *Mots-clés par emplacement* — chaque `<img>` des modèles porte un attribut `data-keywords` (validé contre l'API : chaque requête renvoie des résultats CC0) ; il sert à l'illustration automatique et préremplit la recherche lors d'un remplacement manuel.
+- *Illustration à la création* — case « Illustrer avec des photos libres de droits (Openverse) » dans l'écran d'accueil, cochée par défaut ; le projet s'ouvre immédiatement avec les placeholders SVG, les photos apparaissent au fil des téléchargements (thread d'arrière-plan, jeton d'invalidation si le projet change) ; hors ligne, rien ne casse, les placeholders restent.
+- *Remplacement au clic* — nouveau bouton bascule : l'image survolée se surligne, un clic ouvre un dialogue prérempli avec ses mots-clés, grille de vignettes CC0, un clic remplace l'image (l'`alt` reprend le titre de la photo) ; mode exclusif avec l'édition WYSIWYG et la suppression de blocs, réarmé après chaque rechargement.
+
+---
+
 ## v1.10.0 — Dimensions de la fenêtre conservées (12 juin 2026)
 
 **Description courte :** la taille de la fenêtre et son état maximisé sont retenus à la fermeture et restaurés au lancement suivant.

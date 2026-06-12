@@ -152,7 +152,8 @@ PAGES = {
   </table>
 
   <figure>
-    <img src="{_SVG_PLACEHOLDER}" alt="Illustration abstraite">
+    <img src="{_SVG_PLACEHOLDER}" alt="Illustration abstraite"
+         data-keywords="abstract geometric pattern">
     <figcaption>Les trois couches d'un design système fondé sur les
       variables CSS.</figcaption>
   </figure>
@@ -337,7 +338,8 @@ _BLOG = _model("Encre &amp; Café", "© 2026 Encre &amp; Café — un billet cha
     <li>relire la veille donne le point de départ du jour.</li>
   </ul>
   <figure>
-    <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer">
+    <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer"
+         data-keywords="notebook handwriting pen">
     <figcaption>Le carnet du mois, ratures comprises.</figcaption>
   </figure>
   <p>La suite au prochain billet — ou sur la page
@@ -348,7 +350,8 @@ _BLOG = _model("Encre &amp; Café", "© 2026 Encre &amp; Café — un billet cha
 <main>
   <h1>À propos</h1>
   <figure>
-    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer">
+    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer"
+         data-keywords="writing desk coffee">
     <figcaption>Le bureau, le carnet, le café.</figcaption>
   </figure>
   <p>Je m'appelle <strong>Jeanne Borel</strong>, rédactrice indépendante.
@@ -412,15 +415,18 @@ _PORTFOLIO = _model("Studio Méridien", "© 2026 Studio Méridien — design gra
   <p>Une sélection de projets récents — identités, éditions et sites.</p>
   <section>
     <figure>
-      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet"
+           data-keywords="graphic design workspace">
       <figcaption>Coopérative du Val — identité complète, 2026.</figcaption>
     </figure>
     <figure>
-      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet"
+           data-keywords="vintage poster art">
       <figcaption>Festival du Doc — affiches et programme, 2025.</figcaption>
     </figure>
     <figure>
-      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet">
+      <img src="{_SVG_PLACEHOLDER}" alt="Aperçu du projet"
+           data-keywords="bookstore shelves">
       <figcaption>Librairie Page 12 — site et papeterie, 2025.</figcaption>
     </figure>
   </section>
@@ -467,7 +473,8 @@ _PERSONNEL = _model("Camille Vasseur", "© 2026 Camille Vasseur", {
 <main>
   <h1>Bonjour, je suis Camille</h1>
   <figure>
-    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer">
+    <img src="{_SVG_PLACEHOLDER}" alt="Portrait à remplacer"
+         data-keywords="hiking mountain trail">
     <figcaption>Quelque part entre deux randonnées.</figcaption>
   </figure>
   <p>Développeuse le jour, photographe le week-end. Ce site rassemble
@@ -899,7 +906,8 @@ BLOCKS = {
     "Illustration": ("main", f"""\
   <section>
     <figure>
-      <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer">
+      <img src="{_SVG_PLACEHOLDER}" alt="Illustration à remplacer"
+           data-keywords="abstract background">
       <figcaption>Légende de l'illustration.</figcaption>
     </figure>
   </section>
