@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.10.0 — Dimensions de la fenêtre conservées (12 juin 2026)
+
+**Description courte :** la taille de la fenêtre et son état maximisé sont retenus à la fermeture et restaurés au lancement suivant.
+
+**Explication commentée :**
+
+- *État conservé* — à la fermeture (`close-request`), largeur, hauteur et maximisation sont écrits dans `~/.config/themo/state.conf` (format `GLib.KeyFile`, comme le `themo.conf` des projets) ; un échec d'écriture ne bloque jamais la fermeture.
+- *Taille fidèle* — la lecture passe par `get_default_size()`, qui suit en GTK4 la taille réelle hors maximisation : fermer la fenêtre maximisée retient aussi la taille « restaurée » d'avant maximisation.
+- *Restauration prudente* — au démarrage, la taille par défaut (1280 × 900) est posée d'abord, puis remplacée par les valeurs du fichier si elles sont valides ; premier lancement ou fichier corrompu retombent sur le défaut.
+
+---
+
 ## v1.9.0 — Modèles de projet, écran d'accueil et édition enrichie (12 juin 2026)
 
 **Description courte :** un nouveau projet se crée depuis un choix de modèles complets (Blog, Portfolio, Personnel, Événement, Institutionnel…) présentés dans un écran d'accueil illustré, chacun avec son style graphique et son ambiance assortis ; l'aperçu gagne la suppression de blocs au clic, le header et le footer deviennent communs à tout le site, et le sélecteur de pages disparaît au profit de la navigation par liens.

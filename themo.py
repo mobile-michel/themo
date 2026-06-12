@@ -41,6 +41,9 @@ from project import Project, slugify  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
 
+# État de la fenêtre (dimensions, maximisation), conservé entre les sessions
+STATE_FILE = Path(GLib.get_user_config_dir()) / "themo" / "state.conf"
+
 # Style graphique appliqué d'office au modèle de projet qui a le sien ;
 # l'utilisateur peut ensuite en changer librement dans la barre latérale.
 MODEL_STYLES = {
@@ -152,7 +155,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._loaded_page = None  # page actuellement rendue dans l'aperçu
         self._current_page = None  # page affichée et éditée
 
-        self.set_default_size(1280, 900)
+        self._restore_window_state()
+        self.connect("close-request", self._save_window_state)
 
         split = Adw.OverlaySplitView()
         split.set_min_sidebar_width(330)
@@ -167,6 +171,36 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._install_actions()
         self._update_title()
         self._show_page()
+
+    # -- État de la fenêtre --------------------------------------------------
+
+    def _restore_window_state(self):
+        self.set_default_size(1280, 900)
+        kf = GLib.KeyFile()
+        try:
+            kf.load_from_file(str(STATE_FILE), GLib.KeyFileFlags.NONE)
+            width = kf.get_integer("window", "width")
+            height = kf.get_integer("window", "height")
+            if width > 0 and height > 0:
+                self.set_default_size(width, height)
+            if kf.get_boolean("window", "maximized"):
+                self.maximize()
+        except GLib.Error:
+            pass  # premier lancement ou fichier invalide : taille par défaut
+
+    def _save_window_state(self, *_args):
+        # default-width/height suivent la taille courante hors maximisation
+        kf = GLib.KeyFile()
+        width, height = self.get_default_size()
+        kf.set_integer("window", "width", width)
+        kf.set_integer("window", "height", height)
+        kf.set_boolean("window", "maximized", self.is_maximized())
+        try:
+            STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            kf.save_to_file(str(STATE_FILE))
+        except (GLib.Error, OSError):
+            pass  # ne jamais bloquer la fermeture pour un état non enregistré
+        return False  # poursuivre la fermeture
 
     # -- Barre latérale : les tokens de base --------------------------------
 
