@@ -47,14 +47,18 @@ La fenêtre se divise en deux :
 |---|---|
 | 🌙 | Prévisualiser le thème sombre |
 | Curseur de sélection | Éditer le texte directement dans l'aperçu |
+| Corbeille | Supprimer un bloc en cliquant dans l'aperçu |
+| Image | Remplacer une image en cliquant dans l'aperçu |
 | Crayon | Ouvrir l'éditeur HTML de la page |
-| Sélecteur central | Changer de page |
-| ⋮ | Ajouter, dupliquer, renommer, supprimer une page |
+| Nom central | La page affichée |
+| ⋮ | Gérer les pages, aller à une page |
 | + | Insérer un bloc dans la page |
 | Enregistrer | Enregistrer le projet (Ctrl+S) |
 | ☰ | Projet (nouveau, ouvrir, enregistrer sous) et export |
 
-Au lancement, le projet contient trois pages de démonstration : Vitrine, Article et Formulaire. Elles vous serviront de matière première.
+Au lancement, un **écran d'accueil** propose de démarrer depuis un modèle de projet : Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel ou Page vide — chaque carte montre un schéma du modèle, sa description et son nombre de pages. Choisir un modèle applique d'office le style graphique assorti, et la case « Illustrer avec des photos libres de droits (Openverse) » remplace les images de remplissage par de vraies photos CC0 (décochez-la pour rester hors ligne). On retrouve le même écran via ☰ → *Nouveau projet*, et Échap le referme sans rien changer.
+
+**Pour ce tutoriel, choisissez Démonstration** : trois pages — Vitrine, Article et Formulaire — qui vous serviront de matière première. (Au passage : la fenêtre retient ses dimensions d'une session à l'autre.)
 
 ## 3. Choisir un style graphique
 
@@ -63,8 +67,9 @@ Tout en haut de la barre latérale, le **Style graphique** est le premier choix 
 - **Moderne** — bleu vif et ambre, sans-serif géométrique, pastilles arrondies, ombres présentes.
 - **Classique** — bleu profond et cuivre, titres Didone (esprit Bodoni), texte Transitional, contrasté, rayons discrets.
 - **Minimal** — ardoise et gris bleuté, ambiance douce, étroit et aéré, sans rayons ni ombres.
+- **Éditorial, Galerie, Chaleureux, Festif, Officiel** — pensés pour les modèles de projet (Blog, Portfolio, Personnel, Événement, Institutionnel) qui les appliquent d'office à l'accueil ; rien n'empêche de les utiliser ailleurs.
 
-Essayez les trois en observant l'aperçu : couleurs, polices, espacements et formes changent d'un coup. **Choisissez Classique** pour ce tutoriel.
+Essayez-les en observant l'aperçu : couleurs, polices, espacements et formes changent d'un coup. **Choisissez Classique** pour ce tutoriel.
 
 Chaque token reste ensuite ajustable individuellement — le style n'est qu'un point de départ. Si vous vous perdez en route, la flèche ↶ ramène au préréglage du style courant.
 
@@ -76,7 +81,7 @@ Donnons une identité propre à notre studio fictif.
 
 1. **Couleur primaire** : cliquez la pastille et choisissez un vert  forêt, par exemple `#166534`. Toute la gamme 50→900 est recalculée  (en espace OKLCH, votre couleur exacte est conservée sur son palier),  ainsi que la gamme neutre, teintée de la même nuance.
 2. **Couleur secondaire** : un ocre, par exemple `#a16207`. Elle colore les citations et la sélection de texte — sélectionnez du texte dans  l'aperçu pour la voir.
-3. **Ambiance des couleurs** : la façon dont les couleurs sont appliquées aux rôles (fond, surface, texte, accent…). *Neutre*, *Doux* (fond teinté) ou *Contrasté*. Gardez Contrasté.
+3. **Ambiance des couleurs** : la façon dont les couleurs sont appliquées aux rôles (fond, surface, texte, accent…). *Neutre*, *Doux* (fond teinté), *Contrasté*, *Encre* (papier et accents profonds), *Chaleureux* (fond teinté par la secondaire) ou *Vif* (surfaces saturées). Gardez Contrasté.
 4. **Inclure le mode sombre** : laissé activé, le CSS exporté contient les deux thèmes. Le bouton 🌙 de l'aperçu permet de vérifier le rendu sombre à tout moment.
 
 ### Typographie
@@ -97,7 +102,7 @@ Micro et macro sont indépendants : resserrez l'intérieur des composants sans t
 
 ## 5. Gérer les pages
 
-Le menu **⋮** à côté du sélecteur de pages permet d'**ajouter** (Ctrl+N), **dupliquer**, **renommer** et **supprimer** des pages.
+Le menu **⋮** à côté du nom de la page permet d'**ajouter** (Ctrl+N), **dupliquer**, **renommer** et **supprimer** des pages.
 
 Ajoutez une page : menu ⋮ → *Ajouter une page…*, nommez-la « Tarifs » et partez du modèle *Page vide*.
 
@@ -106,7 +111,7 @@ Deux choses se produisent automatiquement :
 1. La nouvelle page reçoit une **navigation complète** listant toutes les pages du projet, avec sa propre entrée marquée `aria-current="page"`.
 2. Le lien « Tarifs » est **ajouté à la nav de toutes les autres pages**. De même, renommer ou supprimer une page met à jour les liens partout. Vos liens personnalisés (`href="#"`, liens externes) ne sont jamais touchés — chaque lien de page est identifié par son `href`.
 
-Les liens sont **fonctionnels dans l'aperçu** : cliquez « Vitrine » dans la nav, l'aperçu y bascule et le sélecteur suit. Un lien externe s'ouvre dans votre navigateur.
+Les liens sont **fonctionnels dans l'aperçu**, et c'est ainsi que l'on navigue : cliquez « Vitrine » dans la nav, l'aperçu y bascule et le nom en haut suit. Un lien externe s'ouvre dans votre navigateur. Si une page n'a plus de lien dans la nav, le menu ⋮ → *Aller à la page* y mène toujours (la page courante y est cochée).
 
 ## 6. Composer une page avec les blocs
 
@@ -116,6 +121,12 @@ Votre page « Tarifs » est presque vide. Le menu **+** insère des blocs prêts
 - *Dans le contenu* : **Titre et texte**, **Grille de cartes**, **Tableau**, **Citation**, **Formulaire de contact**, **Questions fréquentes**, **Illustration**, **Séparateur** — insérés en fin de contenu.
 
 Pour « Tarifs », insérez dans l'ordre : un **Héro pleine largeur**, un **Tableau**, une **Citation** et des **Questions fréquentes**. La page est structurée — reste à écrire le contenu.
+
+Un bloc en trop ? Activez le bouton **corbeille** : le bloc survolé se surligne en rouge dans l'aperçu, un clic le supprime. L'en-tête, la nav et le pied de page ne sont jamais candidats — impossible de casser la structure par mégarde.
+
+### Remplacer les images
+
+Activez le bouton **image** et cliquez une illustration dans l'aperçu : un dialogue s'ouvre, prérempli avec les mots-clés de cet emplacement, et présente une grille de photos libres de droits (licence CC0, via Openverse — mots-clés anglais conseillés). Un clic remplace l'image : elle est téléchargée et embarquée dans la page, qui reste consultable hors ligne.
 
 ## 7. Éditer le contenu
 
@@ -134,6 +145,8 @@ Les modifications sont synchronisées au fil de la frappe (la pastille ● s'all
 Activez le bouton **crayon** : l'éditeur source s'ouvre sous l'aperçu (coloration syntaxique, numéros de ligne). Réorganisez les sections, dédoublez une carte, ajustez un attribut — l'aperçu suit la frappe.
 
 Règle d'or du design système : **pas d'attribut `class`**. Tout le style vient des éléments HTML eux-mêmes ; si vous sentez le besoin d'une classe, c'est probablement qu'il manque un token ou un bloc.
+
+> L'en-tête et le pied de page sont **communs à tout le site** : modifiez la marque ou le pied sur n'importe quelle page (dans l'aperçu ou l'éditeur), toutes les pages suivent. Seule la mise en évidence de la page courante (`aria-current`) reste propre à chacune.
 
 ## 8. Enregistrer le projet
 

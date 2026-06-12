@@ -19,8 +19,8 @@ Tout le reste est **calculé automatiquement** :
 Le CSS généré a trois étages :
 
 1. **Tokens primitifs** dans `:root` ;
-2. **Tokens sémantiques** (`--background`, `--text`, `--accent`…) via un template au choix — *Neutre*, *Doux*, *Contrasté* — déclinés en clair et en sombre (`prefers-color-scheme` + `data-theme`) ;
-3. **Styles appliqués directement aux éléments HTML** (`body`, `h1`, `a`, `button`, `table`, formulaires…) via un second template — *Moderne*, *Classique*, *Minimal*. Aucune classe : le HTML reste nu.
+2. **Tokens sémantiques** (`--background`, `--text`, `--accent`…) via un template au choix — *Neutre*, *Doux*, *Contrasté*, *Encre*, *Chaleureux*, *Vif* — déclinés en clair et en sombre (`prefers-color-scheme` + `data-theme`) ;
+3. **Styles appliqués directement aux éléments HTML** (`body`, `h1`, `a`, `button`, `table`, formulaires…) via un second template — *Moderne*, *Classique*, *Minimal*, *Éditorial*, *Galerie*, *Chaleureux*, *Festif*, *Officiel*. Aucune classe : le HTML reste nu.
 
 Un parcours guidé pas à pas est disponible dans [TUTORIEL.md](TUTORIEL.md).
 
@@ -40,13 +40,17 @@ Pour l'avoir dans le menu d'applications (le script injecte le chemin du dépôt
 
 ## Utilisation
 
-- Le style graphique, tout en haut, prérègle l'ensemble des tokens selon son caractère (Moderne, Classique, Minimal) ; chaque token reste ensuite ajustable librement, et le bouton de réinitialisation réaligne le tout sur le style courant.
+- Au démarrage (et via ☰ → Nouveau projet), un **écran d'accueil** propose des **modèles de projet** complets — Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel, Page vide — avec vignette, description et nombre de pages. Choisir un modèle applique d'office le style graphique et l'ambiance assortis. La case **« Illustrer avec des photos libres de droits (Openverse) »**, cochée par défaut, remplace les images de remplissage par des photos CC0 trouvées selon les mots-clés de chaque emplacement, téléchargées puis embarquées dans les pages ; décochée (ou hors ligne), les placeholders SVG restent en place.
+- Le style graphique, tout en haut, prérègle l'ensemble des tokens selon son caractère (Moderne, Classique, Minimal, Éditorial, Galerie, Chaleureux, Festif, Officiel) ; chaque token reste ensuite ajustable librement, et le bouton de réinitialisation réaligne le tout sur le style courant.
 - La barre latérale modifie les tokens, l'aperçu se met à jour en direct.
-- Le sélecteur en haut change la page affichée ; le menu adjacent permet d'**ajouter** (depuis un modèle : page vide, Vitrine, Article, Formulaire), **dupliquer**, **renommer** et **supprimer** des pages. Le bouton lune bascule clair/sombre.
+- Le nom de la **page courante** s'affiche en haut de l'aperçu ; on passe de page en page par les liens de la nav, ou par la section « Aller à la page » du menu ⋮ (page courante cochée). Ce menu permet aussi d'**ajouter** (depuis un modèle de page), **dupliquer**, **renommer** et **supprimer** des pages. Le bouton lune bascule clair/sombre.
 - La **navigation principale est tenue à jour automatiquement** : ajouter, dupliquer, renommer ou supprimer une page répercute le lien correspondant dans la nav d'en-tête de toutes les pages (identifié par son `href` en slug) ; la page créée reçoit une nav complète avec sa propre entrée marquée `aria-current="page"`. Les liens personnalisés (`href="#"`, liens externes) ne sont jamais touchés.
 - Les **liens fonctionnent dans l'aperçu** : un clic sur un lien interne (`page.html`) bascule l'aperçu sur la page correspondante du projet, un lien externe (`http…`, `mailto:`) s'ouvre dans l'application par défaut, et les ancres (`#…`) défilent normalement. Dans les pages exportées, les mêmes liens fonctionnent tels quels puisque les fichiers existent côte à côte.
 - Le bouton crayon ouvre l'**éditeur HTML** de la page courante (GtkSourceView, coloration syntaxique) ; l'aperçu se met à jour pendant la frappe. Seul le corps de la page s'édite — et pour rester fidèle au design système, n'utilisez pas d'attribut `class`.
 - Le bouton **+** insère un **bloc** prêt à l'emploi dans la page courante : héro pleine largeur, titre et texte, grille de cartes, tableau, citation, formulaire de contact, questions fréquentes, illustration, séparateur. Chaque bloc est garanti sans classe et placé au bon endroit (le héro avant `<main>`, le reste en fin de contenu) ; réorganisez ensuite dans l'éditeur HTML.
+- Le bouton **corbeille** active la **suppression de blocs** : le bloc survolé dans l'aperçu (enfant direct de `<main>` ou section héro) se surligne en rouge, un clic le supprime — l'en-tête, la nav et le pied de page ne sont jamais candidats.
+- Le bouton **image** active le **remplacement d'images** : cliquez une image dans l'aperçu, un dialogue prérempli avec ses mots-clés présente une grille de photos CC0 (Openverse) ; un clic la remplace, embarquée dans la page.
+- L'**en-tête et le pied de page sont communs à tout le site** : les modifier sur une page (texte de la marque, pied…) se répercute sur toutes les autres, en préservant la mise en évidence `aria-current` propre à chacune.
 - Le bouton d'**édition du texte** (curseur de sélection) rend l'aperçu directement éditable : cliquez et tapez dans la page, un liseré pointillé signale le mode actif. Les modifications sont synchronisées au fil de la frappe, et changer un token pendant l'édition met à jour les styles sans recharger la page. Ce mode est réservé au texte : pour la structure (ajouter des sections, des tableaux…), passez par l'éditeur HTML — les deux modes sont exclusifs. À noter : WebKit normalise le balisage de la page éditée (indentation perdue).
 - Le travail s'organise en **projet** : un dossier contenant `themo.conf` (tokens, format INI), `design-system.css` et une page HTML complète par page du projet — des fichiers ordinaires, utilisables tels quels. Menu ☰ : Nouveau / Ouvrir / Enregistrer (Ctrl+S) / Enregistrer sous… Utilisez un dossier dédié par projet.
 - Menu ☰ → **Exporter le CSS…** : écrit `design-system.css` seul ; **Exporter CSS + pages HTML…** : écrit aussi toutes les pages du projet.
@@ -60,8 +64,9 @@ Héro pleine largeur : placez une `<section>` directement dans `<body>`, avant `
 - `themo.py` — application GTK4/Adwaita (fenêtre, aperçu WebKit, éditeur, export)
 - `tokens.py` — calculs des tokens dérivés (OKLCH, échelles), préréglages
 - `css_gen.py` — templates sémantiques + éléments, assemblage du CSS
-- `pages.py` — modèles de pages HTML (sans classes)
+- `pages.py` — modèles de pages et de projets HTML (sans classes)
 - `project.py` — projet sur disque : tokens (INI) + pages HTML
+- `openverse.py` — recherche de photos CC0 (API Openverse), embarquées en data URI
 - `themo.desktop` — lanceur pour le menu d'applications
 
 ## Applications comparables
