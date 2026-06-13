@@ -1926,7 +1926,12 @@ class ThemoWindow(Adw.ApplicationWindow):
         except GLib.Error:
             return
         for name, content in publish.site_files(self.project).items():
-            (folder / name).write_text(content, encoding="utf-8")
+            target = folder / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                target.write_bytes(content)
+            else:
+                target.write_text(content, encoding="utf-8")
         self.toasts.add_toast(Adw.Toast(
             title=f"CSS, {len(self.project.pages)} pages, index.html et "
                   f"fichiers SEO exportés dans {folder.name}/"))

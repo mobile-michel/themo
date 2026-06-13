@@ -72,7 +72,12 @@ def rsync(dest, files):
         dest += "/"
     with tempfile.TemporaryDirectory(prefix="themo-publish-") as tmp:
         for name, content in files.items():
-            Path(tmp, name).write_text(content, encoding="utf-8")
+            target = Path(tmp, name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                target.write_bytes(content)
+            else:
+                target.write_text(content, encoding="utf-8")
         try:
             proc = subprocess.run(
                 ["rsync", "-az", "--timeout=30",
@@ -124,9 +129,19 @@ def ftp_upload(host, user, password, path, files, secure=True):
                 except ftplib.error_perm as exc:
                     return False, (f"dossier « {segment} » absent et "
                                    f"impossible à créer : {exc}")
+        made = set()
         for name, content in files.items():
-            ftp.storbinary("STOR " + name,
-                           io.BytesIO(content.encode("utf-8")))
+            if "/" in name:  # créer le sous-dossier (images/) au besoin
+                sub = name.rsplit("/", 1)[0]
+                if sub not in made:
+                    try:
+                        ftp.mkd(sub)
+                    except ftplib.error_perm:
+                        pass  # existe déjà
+                    made.add(sub)
+            blob = content if isinstance(content, bytes) else \
+                content.encode("utf-8")
+            ftp.storbinary("STOR " + name, io.BytesIO(blob))
     except ftplib.error_perm as exc:
         if str(exc).startswith("530"):
             return False, "identifiants refusés (utilisateur ou mot de passe)"

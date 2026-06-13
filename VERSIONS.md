@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.14.0 — Images en fichiers : pages plus légères et indexables (13 juin 2026)
+
+**Description courte :** les photos (Openverse) ne sont plus intégrées en base64 dans le HTML mais enregistrées comme fichiers dans `images/`, référencées en relatif avec `loading="lazy"`, dimensions et `alt` — pages plus légères, cacheables et indexables.
+
+**Explication commentée :**
+
+- *Sortie sur fichiers* — à l'enregistrement, l'export et la publication, chaque image en data URI est écrite dans `images/<empreinte>.<ext>` (nom stable par contenu) et la balise réécrite (`loading="lazy"`, `width`/`height` lus dans les octets PNG/GIF/JPEG quand c'est possible). Les placeholders SVG, légers, restent en ligne.
+- *Modèle en mémoire inchangé* — pendant l'édition, les images restent des data URI : aperçu, édition WYSIWYG, éditeur HTML et remplacement d'image fonctionnent comme avant. La conversion se fait aux frontières : `externalize` à l'écriture, `internalize` au chargement (les fichiers `images/` redeviennent des data URI). Bénéfice annexe : l'éditeur HTML affiche `<img src="images/…">` au lieu d'un énorme blob base64.
+- *Nettoyage et publication* — les images orphelines (remplacées) sont supprimées du dossier `images/` à l'enregistrement ; Netlify (zip), SSH/rsync et FTP/FTPS gèrent le dossier `images/` et les fichiers binaires (le FTP crée le sous-dossier au besoin).
+
+---
+
 ## v1.13.0 — Référencement : en-tête SEO, sitemap et favicon (13 juin 2026)
 
 **Description courte :** les pages exportées et publiées portent désormais un en-tête complet pour le référencement (description, langue, URL canonique, Open Graph, theme-color, favicon), et le site reçoit `favicon.svg`, `robots.txt` et `sitemap.xml`.

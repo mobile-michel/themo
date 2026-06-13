@@ -20,6 +20,7 @@ from tokens import Config
 from css_gen import generate_css
 from pages import (PAGES, wrap_export, slugify,  # noqa: F401 (réexporté)
                    favicon_svg, robots_txt, sitemap_xml)
+from openverse import externalize, internalize
 
 _BODY_RE = re.compile(r"<body[^>]*>(.*)</body>", re.S | re.I)
 _TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
@@ -78,19 +79,27 @@ class Project:
         return urls
 
     def web_files(self):
-        """Tous les fichiers du site publiable : nom -> contenu."""
+        """Tous les fichiers du site publiable : nom -> contenu (str ou
+        octets pour les images). Les images en data URI sont sorties dans
+        images/."""
         files = {"design-system.css": generate_css(self.cfg)}
+        images = {}
+        bodies = {}
         for name, body in self.pages.items():
+            bodies[name], imgs = externalize(body)
+            images.update(imgs)
+        for name in self.pages:
             files[slugify(name) + ".html"] = wrap_export(
-                body, name, self.page_meta(name))
+                bodies[name], name, self.page_meta(name))
         home = self.home_page()
         files["index.html"] = wrap_export(
-            self.pages[home], home, self.page_meta(home))
+            bodies[home], home, self.page_meta(home))
         files["favicon.svg"] = favicon_svg(self.cfg.primary)
         files["robots.txt"] = robots_txt(self.base_url())
         urls = self.site_urls()
         if urls:
             files["sitemap.xml"] = sitemap_xml(urls)
+        files.update(images)
         return files
 
     # -- Enregistrement ------------------------------------------------------
@@ -129,16 +138,26 @@ class Project:
         kf.save_to_file(str(self.path / "themo.conf"))
 
         # tous les fichiers du site (css, pages, index, favicon, robots,
-        # sitemap), construits une seule fois ici et à la publication
+        # sitemap, images/), construits une seule fois ici et à la publication
         files = self.web_files()
         for filename, content in files.items():
-            (self.path / filename).write_text(content, encoding="utf-8")
-        # retirer les pages orphelines (supprimées ou renommées)
+            target = self.path / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                target.write_bytes(content)
+            else:
+                target.write_text(content, encoding="utf-8")
+        # retirer les pages et images orphelines (supprimées ou renommées)
         if was_project:
             keep = set(files)
             for f in self.path.glob("*.html"):
                 if f.name not in keep:
                     f.unlink()
+            img_dir = self.path / "images"
+            if img_dir.is_dir():
+                for f in img_dir.iterdir():
+                    if f.is_file() and f"images/{f.name}" not in keep:
+                        f.unlink()
 
     # -- Chargement ------------------------------------------------------------
 
@@ -179,6 +198,15 @@ class Project:
             pages[name] = (body.group(1).strip() + "\n") if body else text
         if not pages:
             pages = dict(PAGES)
+
+        # réinjecter les images du dossier images/ comme data URI (forme
+        # de travail en mémoire), l'inverse de l'export
+        img_dir = path / "images"
+        if img_dir.is_dir():
+            images = {f"images/{f.name}": f.read_bytes()
+                      for f in img_dir.iterdir() if f.is_file()}
+            if images:
+                pages = {n: internalize(b, images) for n, b in pages.items()}
 
         project = cls(cfg, pages, path)
         try:

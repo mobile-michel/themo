@@ -1,8 +1,12 @@
 """Recherche d'images libres de droits via l'API Openverse.
 
-Photos sous licence CC0 uniquement : utilisables sans attribution. Les
-images choisies sont téléchargées puis embarquées en data URI dans les
-pages — l'aperçu ne référence jamais de contenu distant.
+Photos sous licence CC0 uniquement : utilisables sans attribution. Pendant
+l'édition, les images vivent en data URI dans le corps des pages — l'aperçu
+ne référence jamais de contenu distant. À l'enregistrement et à la
+publication, elles sont sorties dans un dossier `images/` (fichiers
+référencés en relatif, avec `loading="lazy"` et dimensions) ; au
+rechargement, elles redeviennent des data URI. Voir `externalize` /
+`internalize`.
 
 Les emplacements d'images des modèles portent un attribut data-keywords :
 il sert de requête pour l'illustration automatique à la création du projet
@@ -10,8 +14,10 @@ et préremplit la recherche lors d'un remplacement manuel.
 """
 
 import base64
+import hashlib
 import html
 import json
+import os
 import re
 import time
 import urllib.error
@@ -92,3 +98,94 @@ def replace_img(body, index, src, alt=None):
                          tag, count=1)
         return body[:m.start()] + tag + body[m.end():]
     return body
+
+
+# -- Images : data URI <-> fichiers du dossier images/ -----------------------
+
+_EXT_FOR_MIME = {"image/jpeg": ".jpg", "image/png": ".png",
+                 "image/gif": ".gif", "image/webp": ".webp"}
+_MIME_FOR_EXT = {".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                 ".png": "image/png", ".gif": "image/gif",
+                 ".webp": "image/webp", ".svg": "image/svg+xml"}
+_DATA_URI_RE = re.compile(r"data:(image/[a-z0-9.+-]+);base64,(.*)$", re.I | re.S)
+
+
+def image_dimensions(data):
+    """(largeur, hauteur) d'une image PNG/GIF/JPEG, ou None si inconnu."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) >= 24:
+        return (int.from_bytes(data[16:20], "big"),
+                int.from_bytes(data[20:24], "big"))
+    if data[:6] in (b"GIF87a", b"GIF89a") and len(data) >= 10:
+        return (int.from_bytes(data[6:8], "little"),
+                int.from_bytes(data[8:10], "little"))
+    if data[:2] == b"\xff\xd8":  # JPEG : chercher un marqueur SOF
+        i, n = 2, len(data)
+        while i + 9 < n:
+            if data[i] != 0xFF:
+                i += 1
+                continue
+            marker = data[i + 1]
+            if marker in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
+                          0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                return (int.from_bytes(data[i + 7:i + 9], "big"),
+                        int.from_bytes(data[i + 5:i + 7], "big"))
+            if marker == 0xD8 or marker == 0xD9 or 0xD0 <= marker <= 0xD7:
+                i += 2
+            else:
+                i += 2 + int.from_bytes(data[i + 2:i + 4], "big")
+    return None
+
+
+def image_name(data, mime):
+    """Nom de fichier stable (par contenu) sous images/."""
+    ext = _EXT_FOR_MIME.get(mime.lower(), ".img")
+    return f"images/{hashlib.sha1(data).hexdigest()[:16]}{ext}"
+
+
+def externalize(body):
+    """Sort les images raster en data URI vers des fichiers.
+
+    Renvoie (corps réécrit, {nom_fichier: octets}). Les placeholders SVG
+    en ligne sont laissés tels quels. Ajoute loading="lazy" et les
+    dimensions si elles peuvent être lues. Idempotent.
+    """
+    files = {}
+
+    def repl(m):
+        tag = m.group(0)
+        dm = _DATA_URI_RE.match(_attr(tag, "src") or "")
+        if not dm:
+            return tag
+        mime = dm.group(1).lower()
+        if mime.startswith("image/svg"):
+            return tag  # placeholder : reste en ligne (léger)
+        try:
+            data = base64.b64decode(dm.group(2))
+        except (ValueError, TypeError):
+            return tag
+        name = image_name(data, mime)
+        files[name] = data
+        tag = re.sub(r'src="[^"]*"', lambda _m: f'src="{name}"', tag, count=1)
+        if "loading=" not in tag:
+            tag = "<img loading=\"lazy\"" + tag[4:]
+        dims = image_dimensions(data)
+        if dims and "width=" not in tag:
+            tag = f'<img width="{dims[0]}" height="{dims[1]}"' + tag[4:]
+        return tag
+
+    return _IMG_RE.sub(repl, body), files
+
+
+def internalize(body, images):
+    """Réinjecte en data URI les images référencées comme fichiers."""
+    def repl(m):
+        tag = m.group(0)
+        src = _attr(tag, "src") or ""
+        if src in images:
+            mime = _MIME_FOR_EXT.get(os.path.splitext(src)[1].lower(),
+                                     "image/jpeg")
+            uri = data_uri(images[src], mime)
+            return re.sub(r'src="[^"]*"', lambda _m: f'src="{uri}"',
+                          tag, count=1)
+        return tag
+    return _IMG_RE.sub(repl, body)
