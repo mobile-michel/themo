@@ -57,7 +57,9 @@ La fenêtre se divise en deux :
 | ⋮ | Gérer les pages, aller à une page |
 | + | Insérer un bloc dans la page |
 | Enregistrer | Enregistrer le projet (Ctrl+S) |
-| ☰ | Projet (nouveau, ouvrir, ouvrir récent, enregistrer sous), export et publication |
+| ☰ | Annuler/rétablir, projet (nouveau, ouvrir, récent, enregistrer), réglages du site, accessibilité, export et publication |
+
+En bas de la barre latérale, un groupe **Contraste** affiche en direct le rapport WCAG (AA/AAA) des couleurs pour le thème prévisualisé — pratique pour garder un texte lisible en ajustant les teintes.
 
 Au lancement, un **écran d'accueil** propose de démarrer depuis un modèle de projet : Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel ou Page vide — chaque carte montre un schéma du modèle, sa description et son nombre de pages. Choisir un modèle applique d'office le style graphique assorti, et la case « Illustrer avec des photos libres de droits (Openverse) » remplace les images de remplissage par de vraies photos CC0 (décochez-la pour rester hors ligne). Tant que rien n'est choisi, l'aperçu derrière reste un canevas vierge (pas un site de démonstration). L'écran liste aussi vos **projets récents** (avec un bouton « En ligne » vers le site publié, le cas échéant) et un bouton *Ouvrir un projet…*. On le retrouve via ☰ → *Nouveau projet*, et Échap le referme sans rien changer.
 
@@ -121,15 +123,15 @@ Les liens sont **fonctionnels dans l'aperçu**, et c'est ainsi que l'on navigue 
 Votre page « Tarifs » est presque vide. Le menu **+** insère des blocs prêts à l'emploi, garantis sans classe CSS et placés au bon endroit :
 
 - *Pleine largeur* : **Héro** — bande qui s'étend sur toute la largeur, contenu aligné sur le reste de la page, insérée avant `<main>`.
-- *Dans le contenu* : **Titre et texte**, **Grille de cartes**, **Tableau**, **Citation**, **Formulaire de contact**, **Questions fréquentes**, **Illustration**, **Séparateur** — insérés en fin de contenu.
+- *Dans le contenu* : **Titre et texte**, **Grille de cartes**, **Tableau**, **Citation**, **Formulaire de contact**, **Questions fréquentes**, **Illustration**, **Appel à l'action**, **Liens sociaux**, **Séparateur** — insérés en fin de contenu.
 
 Pour « Tarifs », insérez dans l'ordre : un **Héro pleine largeur**, un **Tableau**, une **Citation** et des **Questions fréquentes**. La page est structurée — reste à écrire le contenu.
 
-Un bloc en trop ? Activez le bouton **corbeille** : le bloc survolé se surligne en rouge dans l'aperçu, un clic le supprime. L'en-tête, la nav et le pied de page ne sont jamais candidats — impossible de casser la structure par mégarde.
+Un bloc en trop ? Activez le bouton **corbeille** : le bloc survolé se surligne en rouge dans l'aperçu, un clic le supprime (un toast « Annuler » permet de revenir en arrière). L'en-tête, la nav et le pied de page ne sont jamais candidats — impossible de casser la structure par mégarde. Plus largement, **Ctrl+Z / Ctrl+Maj+Z** (ou ☰ → *Annuler/Rétablir*) défont et refont les opérations de structure : blocs, images, pages.
 
 ### Remplacer les images
 
-Activez le bouton **image** et cliquez une illustration dans l'aperçu : un dialogue s'ouvre, prérempli avec les mots-clés de cet emplacement, et présente une grille de photos libres de droits (licence CC0, via Openverse — mots-clés anglais conseillés). Un clic remplace l'image : elle est téléchargée et embarquée dans la page, qui reste consultable hors ligne.
+Activez le bouton **image** et cliquez une illustration dans l'aperçu : un dialogue s'ouvre, prérempli avec les mots-clés de cet emplacement, et présente une grille de photos libres de droits (licence CC0, via Openverse — mots-clés anglais conseillés). Un clic remplace l'image. À l'enregistrement et à l'export, les images sont écrites comme **fichiers dans `images/`** (avec `loading="lazy"` et dimensions) plutôt qu'en base64 : pages plus légères, cacheables et indexables.
 
 ## 7. Éditer le contenu
 
@@ -140,6 +142,8 @@ Deux modes, complémentaires et exclusifs l'un de l'autre :
 Activez le bouton **curseur de sélection**. Un liseré pointillé entoure la page : cliquez n'importe quel texte et tapez, comme dans un traitement de texte. Remplacez « Un titre qui annonce la couleur » par votre titre, ajustez les cellules du tableau, la citation…
 
 Les modifications sont synchronisées au fil de la frappe (la pastille ● s'allume dans la barre latérale). Vous pouvez même changer un token pendant l'édition : les styles se mettent à jour sans recharger la page ni perdre votre saisie.
+
+Une **barre de formatage** apparaît dans l'en-tête : sélectionnez du texte puis cliquez **Gras** (`<strong>`), **Emphase** (`<em>`), **Surligner** (`<mark>`) ou **Lien** (une adresse vous est demandée). Recliquer le même bouton sur une sélection déjà formatée retire le formatage. Ctrl+B / Ctrl+I fonctionnent aussi et produisent des balises sémantiques (jamais de style en ligne).
 
 > Ce mode est réservé au **texte**. WebKit normalise le balisage de la page éditée (l'indentation d'origine est perdue), et la structure se travaille dans l'éditeur HTML.
 
@@ -157,20 +161,29 @@ Règle d'or du design système : **pas d'attribut `class`**. Tout le style vient
 
 ```
 studio/
-├── themo.conf          ← tous les tokens (format INI)
+├── themo.conf          ← tokens et métadonnées (format INI)
 ├── design-system.css   ← la feuille générée, à jour
-├── index.html          ← copie de la page d'accueil
-├── vitrine.html
+├── index.html          ← la page d'accueil (Vitrine), servie à la racine
 ├── article.html
 ├── formulaire.html
-└── tarifs.html
+├── tarifs.html
+├── favicon.svg
+├── robots.txt
+└── images/             ← photos, si vous en avez inséré
 ```
 
-Des fichiers ordinaires : ouvrez `tarifs.html` dans un navigateur, il fonctionne tel quel, liens compris. Le nom de chaque page vit dans sa balise `<title>`. L'`index.html` est la copie de la page d'accueil (menu ⋮ → *Définir comme page d'accueil*), ce qu'un serveur web sert à la racine. Rouvrez le projet plus tard avec ☰ → *Ouvrir un projet…* (Ctrl+O), ou via ☰ → *Ouvrir un projet récent…* : tokens et pages reviennent exactement.
+Des fichiers ordinaires : ouvrez `tarifs.html` dans un navigateur, il fonctionne tel quel, liens compris. Le nom de chaque page vit dans sa balise `<title>`. La **page d'accueil** (menu ⋮ → *Définir comme page d'accueil*, la première par défaut) est écrite comme `index.html` — pas de doublon, et c'est ce qu'un serveur sert à la racine. Un `sitemap.xml` s'ajoute dès que l'adresse du site est connue (après publication). Rouvrez le projet plus tard avec ☰ → *Ouvrir un projet…* (Ctrl+O), ou via ☰ → *Ouvrir un projet récent…* : tout revient exactement.
 
 Si vous fermez l'application avec des modifications non enregistrées, Thémo demande confirmation (Annuler / Quitter sans enregistrer / Enregistrer).
 
-Le menu ☰ propose aussi l'export seul : **Exporter le CSS…** pour la feuille uniquement, **Exporter CSS + pages HTML…** pour tout copier ailleurs sans toucher au projet.
+Le menu ☰ propose aussi l'export seul : **Exporter le CSS…** pour la feuille uniquement, **Exporter CSS + pages HTML…** pour copier le site complet ailleurs sans toucher au projet.
+
+### Référencement et accessibilité
+
+Avant de publier, deux réglages utiles :
+
+- **Référencement** — ☰ → *Réglages du site…* fixe la langue et une description par défaut ; ⋮ → *Description de la page…* en donne une propre à chaque page. À l'export, chaque page reçoit un en-tête complet (description, langue, URL canonique, Open Graph, `theme-color`, favicon), et le site reçoit `robots.txt` et `sitemap.xml`.
+- **Accessibilité** — ☰ → *Vérifier l'accessibilité…* parcourt les pages et signale les images sans `alt`, les titres manquants ou désordonnés, les liens vides et les attributs `class`. Combiné aux badges de contraste de la barre latérale, de quoi livrer un site lisible par tous.
 
 ## 9. Publier le site en ligne
 
@@ -215,6 +228,8 @@ Le jeton et les mots de passe sont conservés dans le trousseau du système. Ren
 | Ctrl+S | Enregistrer le projet |
 | Ctrl+O | Ouvrir un projet |
 | Ctrl+N | Ajouter une page |
+| Ctrl+Z / Ctrl+Maj+Z | Annuler / Rétablir (opérations de structure) |
+| Ctrl+B / Ctrl+I | Gras / Emphase (édition du texte dans l'aperçu) |
 
 ### Tokens générés
 

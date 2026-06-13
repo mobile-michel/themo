@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v2.0.0 — Thémo, générateur de site complet (13 juin 2026)
+
+**Description courte :** version majeure — Thémo n'est plus seulement un générateur de design système CSS, c'est un petit atelier de site statique : modèles de projet, publication en ligne, référencement, accessibilité et édition enrichie. README et TUTORIEL sont mis à jour pour l'ensemble.
+
+**Explication commentée :**
+
+- *Le chemin depuis la 1.0* — au générateur de tokens → CSS (sans classes, OKLCH) se sont ajoutés : projets multi-pages, navigation synchronisée et écran d'accueil illustré (1.5–1.12) ; publication directe Netlify / SSH / FTP-FTPS et page d'accueil `index.html` (1.12–1.14.1) ; en-tête SEO, sitemap et favicon (1.13) ; images en fichiers `images/` (1.14) ; badges de contraste et audit d'accessibilité (1.15) ; formatage sémantique du texte et nouveaux blocs (1.16) ; annuler/refaire des opérations de structure (1.17).
+- *Documentation* — README et TUTORIEL couvrent désormais le référencement, les images-fichiers, l'accessibilité, le formatage du texte, l'annuler/refaire, et l'arborescence de projet à jour (`index.html` comme page d'accueil, `images/`, fichiers SEO).
+- *Bilan* — d'un outil à onglet unique à une application de bureau Linux capable de mener un petit site de la conception à la mise en ligne, toujours sans JSON et sans la moindre classe CSS.
+
+---
+
 ## v1.17.0 — Annuler / Rétablir les opérations de structure (13 juin 2026)
 
 **Description courte :** une pile multi-niveaux annule et rétablit les opérations de structure (blocs, images, pages), sans gêner l'annulation native des éditeurs de texte.
