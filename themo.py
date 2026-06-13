@@ -33,20 +33,74 @@ gi.require_version("GtkSource", "5")
 from gi.repository import (Adw, Gdk, Gio, GLib, Gtk, GtkSource,  # noqa: E402
                            Pango, WebKit)
 
+# Trousseau de secrets (jeton Netlify) ; repli sur fichier 0600 sans libsecret
+try:
+    gi.require_version("Secret", "1")
+    from gi.repository import Secret
+    _SECRET_SCHEMA = Secret.Schema.new(
+        "li.maillard.Themo", Secret.SchemaFlags.NONE,
+        {"key": Secret.SchemaAttributeType.STRING})
+except (ValueError, ImportError):
+    Secret = None
+
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
 from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
 from pages import (MODELS, PROJECT_MODELS, MODEL_DESCRIPTIONS,  # noqa: E402
                    BLOCKS, insert_block, propagate_chrome,
                    nav_add_link, nav_remove_link, nav_rename_link,
-                   nav_set_links, wrap_preview, wrap_export)
+                   nav_set_links, wrap_preview)
 from project import Project, slugify  # noqa: E402
 import openverse  # noqa: E402
+import publish  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
 
 # État de la fenêtre (dimensions, maximisation), conservé entre les sessions
 STATE_FILE = Path(GLib.get_user_config_dir()) / "themo" / "state.conf"
+# Secrets (jeton Netlify, mots de passe FTP) quand le trousseau est absent
+SECRETS_FILE = STATE_FILE.parent / "secrets.conf"
+
+
+def _state_keyfile():
+    """state.conf existant (ou vide) — à modifier puis réenregistrer."""
+    kf = GLib.KeyFile()
+    try:
+        kf.load_from_file(str(STATE_FILE), GLib.KeyFileFlags.NONE)
+    except GLib.Error:
+        pass
+    return kf
+
+
+def recent_projects():
+    """Chemins des projets récents encore présents sur disque."""
+    try:
+        paths = _state_keyfile().get_string_list("recent", "projects")
+    except GLib.Error:
+        return []
+    return [p for p in paths if (Path(p) / "themo.conf").exists()]
+
+
+def remember_recent(path):
+    paths = [str(path)] + [p for p in recent_projects() if p != str(path)]
+    kf = _state_keyfile()
+    kf.set_string_list("recent", "projects", paths[:6])
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        kf.save_to_file(str(STATE_FILE))
+    except (GLib.Error, OSError):
+        pass
+
+
+def published_url(path):
+    """URL en ligne d'un projet sur disque, si elle est connue."""
+    kf = GLib.KeyFile()
+    try:
+        kf.load_from_file(str(Path(path) / "themo.conf"),
+                          GLib.KeyFileFlags.NONE)
+        return kf.get_string("publish", "url")
+    except GLib.Error:
+        return None
 
 # Style graphique appliqué d'office au modèle de projet qui a le sien ;
 # l'utilisateur peut ensuite en changer librement dans la barre latérale.
@@ -149,7 +203,10 @@ class ThemoWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.project = Project()
+        # État initial neutre : un canevas vierge sous l'écran d'accueil,
+        # pas le projet Démonstration (qu'on n'a pas encore choisi). C'est
+        # aussi ce qui reste si l'on referme l'accueil sans rien choisir.
+        self.project = Project(pages=dict(PROJECT_MODELS["Page vide"]))
         self.cfg = self.project.cfg
         self._refresh_id = 0
         self._setters = {}   # attr -> fn(valeur) pour réaligner les widgets
@@ -160,9 +217,10 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._current_page = None  # page affichée et éditée
         self._illustrate_token = None    # invalidation des illustrations
         self._image_search_token = None  # invalidation des recherches
+        self._close_after_save = False   # fermeture demandée via le dialogue
 
         self._restore_window_state()
-        self.connect("close-request", self._save_window_state)
+        self.connect("close-request", self._on_close_request)
 
         split = Adw.OverlaySplitView()
         split.set_min_sidebar_width(330)
@@ -196,7 +254,7 @@ class ThemoWindow(Adw.ApplicationWindow):
 
     def _save_window_state(self, *_args):
         # default-width/height suivent la taille courante hors maximisation
-        kf = GLib.KeyFile()
+        kf = _state_keyfile()  # préserver les autres clés (projets récents)
         width, height = self.get_default_size()
         kf.set_integer("window", "width", width)
         kf.set_integer("window", "height", height)
@@ -206,7 +264,35 @@ class ThemoWindow(Adw.ApplicationWindow):
             kf.save_to_file(str(STATE_FILE))
         except (GLib.Error, OSError):
             pass  # ne jamais bloquer la fermeture pour un état non enregistré
-        return False  # poursuivre la fermeture
+
+    def _on_close_request(self, *_args):
+        self._save_window_state()
+        if not self._dirty:
+            return False  # poursuivre la fermeture
+        dialog = Adw.AlertDialog(
+            heading="Modifications non enregistrées",
+            body=f"Le projet « {self.project.name} » contient des "
+                 f"modifications non enregistrées.")
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("discard", "Quitter sans enregistrer")
+        dialog.add_response("save", "Enregistrer")
+        dialog.set_response_appearance("discard",
+                                       Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_response_appearance("save",
+                                       Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("save")
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            response = d.choose_finish(result)
+            if response == "discard":
+                self._dirty = False
+                self.close()
+            elif response == "save":
+                self._close_after_save = True
+                self._project_save()
+        dialog.choose(self, None, done)
+        return True  # le dialogue décide de la suite
 
     # -- Barre latérale : les tokens de base --------------------------------
 
@@ -462,6 +548,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         manage_menu.append("Dupliquer la page", "win.page-duplicate")
         manage_menu.append("Renommer la page…", "win.page-rename")
         manage_menu.append("Supprimer la page…", "win.page-delete")
+        manage_menu.append("Définir comme page d'accueil", "win.page-home")
         # Garde-fou : toutes les pages restent accessibles ici, même si
         # leur lien a disparu de la navigation.
         self.pages_list_menu = Gio.Menu()
@@ -520,12 +607,14 @@ class ThemoWindow(Adw.ApplicationWindow):
         sect = Gio.Menu()
         sect.append("Nouveau projet", "win.project-new")
         sect.append("Ouvrir un projet…", "win.project-open")
+        sect.append("Ouvrir un projet récent…", "win.project-recent")
         sect.append("Enregistrer", "win.project-save")
         sect.append("Enregistrer sous…", "win.project-save-as")
         project_menu.append_section("Projet", sect)
         sect = Gio.Menu()
         sect.append("Exporter le CSS…", "win.export-css")
         sect.append("Exporter CSS + pages HTML…", "win.export-all")
+        sect.append("Publier sur un serveur…", "win.publish")
         project_menu.append_section("Export", sect)
         burger = Gtk.MenuButton(icon_name="open-menu-symbolic",
                                 menu_model=project_menu,
@@ -971,6 +1060,8 @@ class ThemoWindow(Adw.ApplicationWindow):
             self.project.pages = {
                 (new if k == current else k): nav_rename_link(v, current, new)
                 for k, v in self.project.pages.items()}
+            if self.project.home == current:
+                self.project.home = new
             self._touch()
             self._show_page(new)
         dialog.choose(self, None, done)
@@ -1011,6 +1102,346 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._touch()
             self._show_page()
         dialog.choose(self, None, done)
+
+    def _page_home(self, *_args):
+        current = self._current_page_name()
+        self.project.home = current
+        self._touch()
+        self.toasts.add_toast(Adw.Toast(
+            title=f"« {current} » est la page d'accueil (index.html)"))
+
+    # -- Publication ----------------------------------------------------------
+
+    def _load_secret(self, key):
+        """Lit un secret (trousseau, sinon fichier de repli 0600)."""
+        if Secret:
+            try:
+                return Secret.password_lookup_sync(
+                    _SECRET_SCHEMA, {"key": key}, None)
+            except GLib.Error:
+                return None
+        kf = GLib.KeyFile()
+        try:
+            kf.load_from_file(str(SECRETS_FILE), GLib.KeyFileFlags.NONE)
+            return kf.get_string("secrets", key)
+        except GLib.Error:
+            return None
+
+    def _save_secret(self, key, value):
+        if Secret:
+            try:
+                Secret.password_store_sync(
+                    _SECRET_SCHEMA, {"key": key},
+                    Secret.COLLECTION_DEFAULT, f"Thémo — {key}", value, None)
+                return
+            except GLib.Error:
+                pass
+        kf = GLib.KeyFile()
+        try:
+            kf.load_from_file(str(SECRETS_FILE), GLib.KeyFileFlags.NONE)
+        except GLib.Error:
+            pass
+        kf.set_string("secrets", key, value)
+        SECRETS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        kf.save_to_file(str(SECRETS_FILE))
+        SECRETS_FILE.chmod(0o600)
+
+    def _load_netlify_token(self):
+        return self._load_secret("netlify")
+
+    def _save_netlify_token(self, token):
+        self._save_secret("netlify", token)
+
+    def _procedure_row(self, title, heading, steps, url=None,
+                       url_label="Ouvrir Netlify"):
+        """Ligne d'aide : ouvre la procédure pas à pas, lien facultatif."""
+        row = Adw.ActionRow(title=title, activatable=True)
+        row.add_suffix(Gtk.Image.new_from_icon_name("help-about-symbolic"))
+
+        def show(*_args):
+            dialog = Adw.AlertDialog(heading=heading, body=steps)
+            dialog.add_response("close", "Fermer")
+            if url:
+                dialog.add_response("open", url_label)
+                dialog.set_response_appearance(
+                    "open", Adw.ResponseAppearance.SUGGESTED)
+            dialog.set_close_response("close")
+
+            def done(d, result):
+                if d.choose_finish(result) == "open":
+                    Gio.AppInfo.launch_default_for_uri(url, None)
+            dialog.choose(self, None, done)
+        row.connect("activated", show)
+        return row
+
+    def _publish_dialog(self, *_args):
+        settings = self.project.publish
+        dialog = Adw.Dialog(title="Publier sur un serveur",
+                            content_width=560, content_height=780)
+        page = Adw.PreferencesPage()
+
+        grp = Adw.PreferencesGroup(
+            title="Destination",
+            description=f"La page d'accueil du projet "
+                        f"(« {self.project.home_page()} ») est publiée "
+                        f"comme index.html")
+        method = Adw.ComboRow(title="Publier vers")
+        method.set_model(Gtk.StringList.new(
+            ["Netlify", "Serveur SSH (rsync)", "FTP / FTPS"]))
+        method.set_selected({"ssh": 1, "ftp": 2}.get(
+            settings.get("method"), 0))
+        grp.add(method)
+        page.add(grp)
+
+        netlify_grp = Adw.PreferencesGroup(
+            title="Netlify",
+            description="Un jeton d'accès personnel suffit, conservé "
+                        "dans le trousseau ; le site est créé au premier "
+                        "envoi")
+        token_row = Adw.PasswordEntryRow(title="Jeton d'accès")
+        token_row.set_text(self._load_netlify_token() or "")
+        netlify_grp.add(token_row)
+        netlify_grp.add(self._procedure_row(
+            "Comment créer le jeton ?",
+            "Créer le jeton d'accès",
+            "1. Connectez-vous sur app.netlify.com.\n"
+            "2. Avatar (en haut à droite) → User settings → Applications "
+            "→ Personal access tokens → New access token.\n"
+            "3. Nommez-le (« Thémo »), choisissez une expiration, "
+            "puis Generate token.\n"
+            "4. Copiez le jeton immédiatement — Netlify ne le réaffiche "
+            "jamais — et collez-le dans le champ « Jeton d'accès ». "
+            "Thémo le conserve ensuite dans le trousseau.",
+            "https://app.netlify.com/user/applications"))
+        netlify_grp.add(self._procedure_row(
+            "Comment personnaliser le nom du site ?",
+            "Nom de site personnalisé",
+            "Le site est créé au premier envoi avec un nom aléatoire "
+            "(quelque-chose.netlify.app).\n\n"
+            "1. Ouvrez le tableau de bord Netlify et choisissez votre "
+            "site.\n"
+            "2. Site configuration → Change site name : « monsite » "
+            "donne monsite.netlify.app.\n"
+            "3. Pour un domaine à vous : Domain management → "
+            "Add a domain.\n\n"
+            "Le renommage ne casse rien : Thémo continuera de publier "
+            "vers le même site.",
+            "https://app.netlify.com/"))
+        page.add(netlify_grp)
+
+        ssh_grp = Adw.PreferencesGroup(
+            title="Serveur SSH",
+            description="Authentification par clé SSH uniquement ; "
+                        "le dossier distant doit exister")
+        dest_row = Adw.EntryRow(title="Destination (user@hôte:/chemin/)")
+        dest_row.set_text(settings.get("ssh_dest", ""))
+        ssh_grp.add(dest_row)
+        url_row = Adw.EntryRow(
+            title="Adresse publique du site (facultatif)")
+        url_row.set_text(settings.get("url", "")
+                         if settings.get("method") == "ssh" else "")
+        ssh_grp.add(url_row)
+        ssh_grp.add(self._procedure_row(
+            "Quelles données indiquer ?",
+            "Publier par SSH",
+            "Destination — trois parties, sur le modèle "
+            "michel@exemple.fr:/var/www/monsite/ :\n"
+            "• user : votre nom d'utilisateur SSH sur le serveur ;\n"
+            "• hôte : l'adresse du serveur (domaine ou IP) ;\n"
+            "• /chemin/ : le dossier servi par le serveur web (souvent "
+            "/var/www/… ou ~/public_html/), qui doit déjà exister.\n\n"
+            "La connexion utilise vos clés SSH, jamais de mot de passe. "
+            "Si la publication échoue (« Permission denied »), installez "
+            "votre clé depuis un terminal :\n"
+            "ssh-keygen (une seule fois), puis ssh-copy-id user@hôte.\n\n"
+            "Adresse publique (facultatif) : l'URL où le site est visible "
+            "(https://exemple.fr) — elle alimente le bouton « Ouvrir » "
+            "après publication et l'écran d'accueil."))
+        page.add(ssh_grp)
+
+        is_ftp = settings.get("method") == "ftp"
+        ftp_grp = Adw.PreferencesGroup(
+            title="FTP / FTPS",
+            description="Identifiants fournis par votre hébergeur ; "
+                        "FTPS (connexion chiffrée) recommandé")
+        host_row = Adw.EntryRow(title="Hôte (ftp.exemple.fr)")
+        host_row.set_text(settings.get("ftp_host", ""))
+        ftp_grp.add(host_row)
+        user_row = Adw.EntryRow(title="Utilisateur")
+        user_row.set_text(settings.get("ftp_user", ""))
+        ftp_grp.add(user_row)
+        pass_row = Adw.PasswordEntryRow(title="Mot de passe")
+        if is_ftp and settings.get("ftp_host") and settings.get("ftp_user"):
+            pass_row.set_text(self._load_secret(
+                f"ftp:{settings['ftp_user']}@{settings['ftp_host']}") or "")
+        ftp_grp.add(pass_row)
+        ftp_path_row = Adw.EntryRow(
+            title="Dossier distant (ex. sites/monsite, facultatif)")
+        ftp_path_row.set_text(settings.get("ftp_path", ""))
+        ftp_grp.add(ftp_path_row)
+        secure_row = Adw.SwitchRow(title="Connexion sécurisée (FTPS)")
+        secure_row.set_active(settings.get("ftp_secure", "1") != "0")
+        ftp_grp.add(secure_row)
+        ftp_url_row = Adw.EntryRow(
+            title="Adresse publique du site (facultatif)")
+        ftp_url_row.set_text(settings.get("url", "") if is_ftp else "")
+        ftp_grp.add(ftp_url_row)
+        ftp_grp.add(self._procedure_row(
+            "Quelles données indiquer ?",
+            "Publier par FTP",
+            "Votre hébergeur (espace client, e-mail de bienvenue ou "
+            "panneau cPanel/Plesk) vous a fourni :\n"
+            "• hôte : l'adresse FTP, du type ftp.exemple.fr ;\n"
+            "• utilisateur et mot de passe du compte FTP ;\n"
+            "• dossier distant : le dossier servi par le site, souvent "
+            "www, public_html ou htdocs. Beaucoup d'hébergeurs (comptes "
+            "FTP par site, comme Infomaniak) vous déposent DÉJÀ dans la "
+            "racine du site — dans ce cas, laissez ce champ VIDE. Indice : "
+            "si, une fois connecté, vous voyez déjà un index.html, c'est "
+            "que vous y êtes. Le chemin éventuel est relatif au dossier "
+            "d'accueil (un « / » initial est sans effet) ; un dossier qui "
+            "n'existe pas encore est créé automatiquement.\n\n"
+            "Laissez « Connexion sécurisée (FTPS) » activé ; ne la "
+            "désactivez que si votre hébergeur ne propose pas TLS. Le mot "
+            "de passe est conservé dans le trousseau.\n\n"
+            "Adresse publique (facultatif) : l'URL où le site est visible "
+            "(https://exemple.fr) — elle alimente le bouton « Ouvrir » "
+            "après publication et l'écran d'accueil."))
+        page.add(ftp_grp)
+
+        def update_visibility(*_a):
+            selected = method.get_selected()
+            netlify_grp.set_visible(selected == 0)
+            ssh_grp.set_visible(selected == 1)
+            ftp_grp.set_visible(selected == 2)
+        method.connect("notify::selected", update_visibility)
+        update_visibility()
+
+        button = Gtk.Button(label="Publier")
+        button.add_css_class("suggested-action")
+        button.connect("clicked", lambda *_a: start())
+        bar = Gtk.ActionBar()
+        bar.pack_end(button)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(page)
+        view.add_bottom_bar(bar)
+        dialog.set_child(view)
+
+        def start():
+            files = publish.site_files(self.project)
+            selected = method.get_selected()
+            if selected == 0:
+                token = token_row.get_text().strip()
+                if not token:
+                    self.toasts.add_toast(Adw.Toast(
+                        title="Renseignez le jeton Netlify"))
+                    return
+                self._save_netlify_token(token)
+                settings["method"] = "netlify"
+                self._touch()
+                dialog.close()
+                self._publish_netlify(token, files)
+            elif selected == 1:
+                dest = dest_row.get_text().strip()
+                if not dest:
+                    self.toasts.add_toast(Adw.Toast(
+                        title="Renseignez la destination rsync"))
+                    return
+                settings["method"] = "ssh"
+                settings["ssh_dest"] = dest
+                settings["url"] = url_row.get_text().strip()
+                self._touch()
+                dialog.close()
+                self._publish_ssh(dest, files, settings["url"] or None)
+            else:
+                host = host_row.get_text().strip()
+                user = user_row.get_text().strip()
+                password = pass_row.get_text()
+                if not (host and user and password):
+                    self.toasts.add_toast(Adw.Toast(
+                        title="Renseignez hôte, utilisateur et mot de passe"))
+                    return
+                secure = secure_row.get_active()
+                self._save_secret(f"ftp:{user}@{host}", password)
+                settings["method"] = "ftp"
+                settings["ftp_host"] = host
+                settings["ftp_user"] = user
+                settings["ftp_path"] = ftp_path_row.get_text().strip()
+                settings["ftp_secure"] = "1" if secure else "0"
+                settings["url"] = ftp_url_row.get_text().strip()
+                self._touch()
+                dialog.close()
+                self._publish_ftp(host, user, password,
+                                  settings["ftp_path"], secure, files,
+                                  settings["url"] or None)
+        dialog.present(self)
+
+    def _publish_netlify(self, token, files):
+        site_id = self.project.publish.get("netlify_site")
+        self.toasts.add_toast(Adw.Toast(title="Publication vers Netlify…"))
+
+        def remember(key, value):
+            self.project.publish[key] = value
+            self._touch()
+            return False
+
+        def worker():
+            try:
+                sid = site_id
+                if not sid:
+                    site = publish.netlify_create_site(token)
+                    sid = site["id"]
+                    GLib.idle_add(remember, "netlify_site", sid)
+                deploy = publish.netlify_deploy(token, sid, files)
+                url = deploy.get("ssl_url") or deploy.get("url")
+                if url:
+                    GLib.idle_add(remember, "url", url)
+                GLib.idle_add(self._publish_done, None, url)
+            except Exception as exc:
+                message = str(exc)
+                if "401" in message:
+                    message = "jeton refusé — vérifiez-le sur Netlify"
+                GLib.idle_add(self._publish_done, message, None)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _publish_ssh(self, dest, files, url=None):
+        self.toasts.add_toast(Adw.Toast(title=f"Publication vers {dest}…"))
+
+        def worker():
+            ok, message = publish.rsync(dest, files)
+            GLib.idle_add(self._publish_done,
+                          None if ok else message, url if ok else None)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _publish_ftp(self, host, user, password, path, secure, files,
+                     url=None):
+        self.toasts.add_toast(Adw.Toast(title=f"Publication vers {host}…"))
+
+        def worker():
+            ok, message = publish.ftp_upload(
+                host, user, password, path, files, secure)
+            GLib.idle_add(self._publish_done,
+                          None if ok else message, url if ok else None)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _publish_done(self, error, url):
+        if error:
+            self.toasts.add_toast(Adw.Toast(
+                title=f"Échec de la publication : {error[:120]}"))
+            return False
+        toast = Adw.Toast(title="Site publié")
+        if url:
+            toast.set_button_label("Ouvrir")
+            toast.connect("button-clicked", lambda *_a:
+                          Gio.AppInfo.launch_default_for_uri(url, None))
+            toast.set_timeout(10)
+        self.toasts.add_toast(toast)
+        if self._dirty:
+            self.toasts.add_toast(Adw.Toast(
+                title="Enregistrez le projet (Ctrl+S) pour conserver "
+                      "la destination de publication"))
+        return False
 
     # -- Réactions aux changements -------------------------------------------
 
@@ -1128,7 +1559,51 @@ class ThemoWindow(Adw.ApplicationWindow):
         child.add_css_class("activatable")
         return child
 
-    def _choose_model(self, heading):
+    def _recent_projects_list(self, dialog, header=True):
+        """Liste des projets récents, avec ouverture de la version en ligne."""
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6,
+                      margin_top=12, margin_bottom=12,
+                      margin_start=12, margin_end=12)
+        if header:
+            title = Gtk.Label(label="Projets récents", xalign=0)
+            title.add_css_class("heading")
+            box.append(title)
+        listbox = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        listbox.add_css_class("boxed-list")
+        home = GLib.get_home_dir()
+
+        def open_recent(_row, path):
+            try:
+                project = Project.load(path)
+            except (FileNotFoundError, GLib.Error, OSError) as exc:
+                self.toasts.add_toast(Adw.Toast(title=str(exc)))
+                return
+            dialog.close()
+            self._adopt_project(project)
+            remember_recent(path)
+            self.toasts.add_toast(Adw.Toast(
+                title=f"Projet « {project.name} » ouvert"))
+
+        for path in recent_projects():
+            subtitle = path.replace(home, "~", 1)
+            row = Adw.ActionRow(title=Path(path).name, subtitle=subtitle,
+                                activatable=True)
+            url = published_url(path)
+            if url:
+                online = Gtk.Button(icon_name="web-browser-symbolic",
+                                    tooltip_text=f"Ouvrir la version "
+                                                 f"en ligne — {url}")
+                online.add_css_class("flat")
+                online.set_valign(Gtk.Align.CENTER)
+                online.connect("clicked", lambda _b, u=url:
+                               Gio.AppInfo.launch_default_for_uri(u, None))
+                row.add_suffix(online)
+            row.connect("activated", open_recent, path)
+            listbox.append(row)
+        box.append(listbox)
+        return box
+
+    def _choose_model(self, heading, welcome=False):
         """Galerie des modèles de projet ; Échap conserve le projet courant."""
         names = list(PROJECT_MODELS)
         flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE,
@@ -1139,8 +1614,10 @@ class ThemoWindow(Adw.ApplicationWindow):
                            min_children_per_line=2, max_children_per_line=3)
         for name in names:
             flow.append(self._model_card(name))
-        dialog = Adw.Dialog(title=heading,
-                            content_width=780, content_height=620)
+        has_recents = welcome and recent_projects()
+        dialog = Adw.Dialog(
+            title=heading, content_width=780,
+            content_height=860 if has_recents else 620)
 
         illustrate = Gtk.CheckButton(
             label="Illustrer avec des photos libres de droits (Openverse)")
@@ -1155,10 +1632,19 @@ class ThemoWindow(Adw.ApplicationWindow):
                                             illustrate.get_active())
         flow.connect("child-activated", activated)
 
-        scroller = Gtk.ScrolledWindow(child=flow)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.append(flow)
+        if has_recents:
+            content.append(self._recent_projects_list(dialog))
+        scroller = Gtk.ScrolledWindow(child=content)
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         bar = Gtk.ActionBar()
         bar.pack_start(illustrate)
+        if welcome:
+            open_btn = Gtk.Button(label="Ouvrir un projet…")
+            open_btn.connect("clicked", lambda *_a: (
+                dialog.close(), self._project_open()))
+            bar.pack_end(open_btn)
         view = Adw.ToolbarView()
         view.add_top_bar(Adw.HeaderBar())
         view.set_content(scroller)
@@ -1233,7 +1719,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def show_welcome(self):
-        self._choose_model("Bienvenue dans Thémo — choisissez un modèle")
+        self._choose_model("Bienvenue dans Thémo — choisissez un modèle",
+                           welcome=True)
 
     def _project_new(self, *_args):
         self._choose_model("Nouveau projet")
@@ -1241,6 +1728,21 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _project_open(self, *_args):
         dialog = Gtk.FileDialog(title="Ouvrir un dossier de projet Thémo")
         dialog.select_folder(self, None, self._project_open_done)
+
+    def _project_recent(self, *_args):
+        if not recent_projects():
+            self.toasts.add_toast(Adw.Toast(title="Aucun projet récent"))
+            return
+        dialog = Adw.Dialog(title="Projets récents",
+                            content_width=560, content_height=480)
+        scroller = Gtk.ScrolledWindow(
+            child=self._recent_projects_list(dialog, header=False))
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(scroller)
+        dialog.set_child(view)
+        dialog.present(self)
 
     def _project_open_done(self, dialog, result):
         try:
@@ -1253,6 +1755,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             self.toasts.add_toast(Adw.Toast(title=str(exc)))
             return
         self._adopt_project(project)
+        remember_recent(folder)
         self.toasts.add_toast(Adw.Toast(
             title=f"Projet « {project.name} » ouvert"))
 
@@ -1270,6 +1773,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         try:
             folder = dialog.select_folder_finish(result).get_path()
         except GLib.Error:
+            self._close_after_save = False  # choix de dossier annulé
             return
         self._do_save(folder)
 
@@ -1277,13 +1781,17 @@ class ThemoWindow(Adw.ApplicationWindow):
         try:
             self.project.save(path)
         except OSError as exc:
+            self._close_after_save = False
             self.toasts.add_toast(Adw.Toast(
                 title=f"Échec de l'enregistrement : {exc}"))
             return
         self._dirty = False
         self._update_title()
+        remember_recent(self.project.path)
         self.toasts.add_toast(Adw.Toast(
             title=f"Projet enregistré dans {self.project.path.name}/"))
+        if self._close_after_save:
+            self.close()
 
     # -- Export ----------------------------------------------------------------
 
@@ -1292,12 +1800,15 @@ class ThemoWindow(Adw.ApplicationWindow):
                          ("export-all", self._export_all),
                          ("project-new", self._project_new),
                          ("project-open", self._project_open),
+                         ("project-recent", self._project_recent),
                          ("project-save", self._project_save),
                          ("project-save-as", self._project_save_as),
                          ("page-add", self._page_add),
                          ("page-duplicate", self._page_duplicate),
                          ("page-rename", self._page_rename),
-                         ("page-delete", self._page_delete)):
+                         ("page-delete", self._page_delete),
+                         ("page-home", self._page_home),
+                         ("publish", self._publish_dialog)):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
             self.add_action(action)
@@ -1335,14 +1846,11 @@ class ThemoWindow(Adw.ApplicationWindow):
             folder = Path(dialog.select_folder_finish(result).get_path())
         except GLib.Error:
             return
-        (folder / "design-system.css").write_text(
-            generate_css(self.cfg), encoding="utf-8")
-        for name, body in self.project.pages.items():
-            (folder / f"{slugify(name)}.html").write_text(
-                wrap_export(body, name), encoding="utf-8")
+        for name, content in publish.site_files(self.project).items():
+            (folder / name).write_text(content, encoding="utf-8")
         self.toasts.add_toast(Adw.Toast(
-            title=f"CSS et {len(self.project.pages)} pages HTML exportés "
-                  f"dans {folder.name}/"))
+            title=f"CSS, {len(self.project.pages)} pages et index.html "
+                  f"exportés dans {folder.name}/"))
 
 
 class ThemoApp(Adw.Application):

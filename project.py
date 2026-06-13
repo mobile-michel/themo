@@ -31,6 +31,12 @@ class Project:
         self.cfg = cfg or Config()
         self.pages = dict(pages) if pages is not None else dict(PAGES)
         self.path = Path(path) if path else None
+        self.home = None   # page d'accueil (index.html) ; défaut : la première
+        self.publish = {}  # méthode et destination de publication
+
+    def home_page(self):
+        """Nom de la page exportée aussi comme index.html."""
+        return self.home if self.home in self.pages else next(iter(self.pages))
 
     @property
     def name(self):
@@ -59,17 +65,25 @@ class Project:
                 kf.set_double("tokens", f.name, value)
             else:
                 kf.set_string("tokens", f.name, value)
+        kf.set_string("project", "home", self.home_page())
+        for key, value in self.publish.items():
+            if value:
+                kf.set_string("publish", key, value)
         kf.save_to_file(str(self.path / "themo.conf"))
 
         (self.path / "design-system.css").write_text(
             generate_css(self.cfg), encoding="utf-8")
 
-        keep = set()
+        keep = {"index.html"}
         for name, body in self.pages.items():
             filename = slugify(name) + ".html"
             keep.add(filename)
             (self.path / filename).write_text(
                 wrap_export(body, name), encoding="utf-8")
+        # la page d'accueil est doublée en index.html, attendu des serveurs
+        home = self.home_page()
+        (self.path / "index.html").write_text(
+            wrap_export(self.pages[home], home), encoding="utf-8")
         # retirer les fichiers des pages supprimées ou renommées
         if was_project:
             for f in self.path.glob("*.html"):
@@ -106,6 +120,8 @@ class Project:
 
         pages = {}
         for f in sorted(path.glob("*.html")):
+            if f.name == "index.html":
+                continue  # doublon généré de la page d'accueil
             text = f.read_text(encoding="utf-8")
             body = _BODY_RE.search(text)
             title = _TITLE_RE.search(text)
@@ -114,4 +130,15 @@ class Project:
         if not pages:
             pages = dict(PAGES)
 
-        return cls(cfg, pages, path)
+        project = cls(cfg, pages, path)
+        try:
+            project.home = kf.get_string("project", "home")
+        except GLib.Error:
+            pass
+        for key in ("method", "ssh_dest", "netlify_site", "url",
+                    "ftp_host", "ftp_user", "ftp_path", "ftp_secure"):
+            try:
+                project.publish[key] = kf.get_string("publish", key)
+            except GLib.Error:
+                pass
+        return project

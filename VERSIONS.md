@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.12.0 — Publication en ligne, page d'accueil et projets récents (13 juin 2026)
+
+**Description courte :** un site se publie désormais directement depuis Thémo (Netlify, serveur SSH/rsync ou FTP/FTPS), la page d'accueil est exportée comme `index.html`, les projets récents sont accessibles au lancement et depuis le menu, et l'application avertit avant de fermer un projet non enregistré.
+
+**Explication commentée :**
+
+- *Publication (`publish.py`)* — trois destinations, mémorisées par projet. **Netlify** : un jeton d'accès personnel suffit, le site est créé au premier envoi puis déployé par zip via l'API. **Serveur SSH** : rsync, authentification par clé uniquement (`BatchMode`), sans suppression distante. **FTP / FTPS** : l'identifiant des hébergements mutualisés classiques ; FTPS (TLS) par défaut, canal de données chiffré compris, chemin distant relatif au dossier d'accueil (un `/` initial est sans effet) et segments manquants créés automatiquement. Tout s'exécute en arrière-plan ; jeton et mots de passe vont dans le trousseau (repli fichier 0600). Aides intégrées (créer le jeton, personnaliser le nom de site, données SSH et FTP) et toast « Ouvrir » vers l'URL en ligne.
+- *Page d'accueil → `index.html`* — une page du projet se désigne « page d'accueil » (menu ⋮) ; elle est exportée et publiée aussi comme `index.html`, attendu des serveurs web. Le fichier est ignoré au rechargement et protégé du nettoyage des orphelins.
+- *Écran d'accueil et projets récents* — au lancement, l'application démarre sur un **canevas vierge** (et non plus le projet Démonstration) sous l'écran d'accueil ; celui-ci liste les **projets récents** avec un bouton « En ligne » pour ceux qui sont publiés, et un bouton « Ouvrir un projet… ». Les récents restent accessibles à tout moment par ☰ → *Ouvrir un projet récent…*
+- *Confirmation à la fermeture* — fermer avec des modifications non enregistrées propose désormais Annuler / Quitter sans enregistrer / Enregistrer, ce qui lève la limite documentée depuis la v1.5.0.
+
+---
+
 ## v1.11.0 — Photos libres de droits via Openverse (12 juin 2026)
 
 **Description courte :** à la création d'un projet, les images de remplissage sont remplacées par des photos CC0 trouvées sur Openverse selon des mots-clés propres à chaque modèle (case décochable dans l'écran d'accueil), et un mode « remplacer une image » permet ensuite d'en changer au clic, avec recherche par mots-clés.
