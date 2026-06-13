@@ -913,6 +913,26 @@ BLOCKS = {
     </figure>
   </section>
 """),
+    "Appel à l'action": ("main", """\
+  <section>
+    <h2>Prêt à vous lancer&nbsp;?</h2>
+    <p>Une phrase qui résume la promesse et invite au passage à l'action.</p>
+    <p>
+      <button>Action principale</button>
+      <a href="#">En savoir plus</a>
+    </p>
+  </section>
+"""),
+    "Liens sociaux": ("main", """\
+  <section>
+    <h2>Nous suivre</h2>
+    <ul>
+      <li><a href="#">Mastodon</a></li>
+      <li><a href="#">Bluesky</a></li>
+      <li><a href="#">LinkedIn</a></li>
+    </ul>
+  </section>
+"""),
     "Séparateur": ("main", "  <hr>\n"),
 }
 

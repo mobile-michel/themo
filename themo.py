@@ -450,6 +450,64 @@ class ThemoWindow(Adw.ApplicationWindow):
             sync_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
             WebKit.UserScriptInjectionTime.END, None, None))
 
+        # Formatage de la sélection : enveloppe (ou retire) un élément
+        # sémantique — strong, em, mark — ou un lien, autour du texte
+        # sélectionné dans l'aperçu éditable.
+        format_js = """
+        (function () {
+          function notify() {
+            window.webkit.messageHandlers.edited.postMessage(
+              document.body.innerHTML);
+          }
+          function wrap(range, el) {
+            try { range.surroundContents(el); }
+            catch (e) { el.appendChild(range.extractContents());
+                        range.insertNode(el); }
+          }
+          window._themoFormat = function (tag) {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+            const range = sel.getRangeAt(0);
+            let anc = range.commonAncestorContainer;
+            if (anc.nodeType === 3) anc = anc.parentElement;
+            // éléments du tag chevauchant la sélection : ancêtre (closest)
+            // ou descendants (intersectsNode) — robuste au décalage des
+            // bornes dû au padding (cas de <mark>)
+            const found = [];
+            const up = anc.closest ? anc.closest(tag) : null;
+            if (up) found.push(up);
+            anc.querySelectorAll(tag).forEach(function (el) {
+              if (range.intersectsNode(el)) found.push(el);
+            });
+            if (found.length) {
+              found.forEach(function (el) {                // bascule : retirer
+                const parent = el.parentNode;
+                while (el.firstChild)
+                  parent.insertBefore(el.firstChild, el);
+                parent.removeChild(el);
+              });
+              anc.normalize();
+            } else {
+              wrap(range, document.createElement(tag));
+            }
+            sel.removeAllRanges();
+            notify();
+          };
+          window._themoLink = function (url) {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            wrap(sel.getRangeAt(0), a);
+            sel.removeAllRanges();
+            notify();
+          };
+        })();
+        """
+        ucm.add_script(WebKit.UserScript.new(
+            format_js, WebKit.UserContentInjectedFrames.TOP_FRAME,
+            WebKit.UserScriptInjectionTime.END, None, None))
+
         # Mode « supprimer un bloc » : survol = surlignage du bloc candidat
         # (enfant direct de <main>, ou section héro sous <body>), clic =
         # suppression puis renvoi du <body> à l'application.
@@ -619,6 +677,25 @@ class ThemoWindow(Adw.ApplicationWindow):
             tooltip_text="Remplacer une image en cliquant dans l'aperçu")
         self.image_toggle.connect("toggled", self._on_image_toggled)
 
+        # Barre de formatage du texte sélectionné, révélée en mode WYSIWYG
+        self.format_bar = Gtk.Box(spacing=2)
+        self.format_bar.add_css_class("linked")
+        for icon, tip, cb in (
+                ("format-text-bold-symbolic", "Gras (strong)",
+                 lambda *_a: self._run_js("window._themoFormat('strong');")),
+                ("format-text-italic-symbolic", "Emphase (em)",
+                 lambda *_a: self._run_js("window._themoFormat('em');")),
+                ("format-text-highlight-symbolic", "Surligner (mark)",
+                 lambda *_a: self._run_js("window._themoFormat('mark');")),
+                ("insert-link-symbolic", "Transformer en lien",
+                 self._format_link)):
+            btn = Gtk.Button(icon_name=icon, tooltip_text=tip)
+            btn.connect("clicked", cb)
+            self.format_bar.append(btn)
+        self.format_revealer = Gtk.Revealer(child=self.format_bar)
+        self.format_revealer.set_transition_type(
+            Gtk.RevealerTransitionType.SLIDE_RIGHT)
+
         project_menu = Gio.Menu()
         sect = Gio.Menu()
         sect.append("Nouveau projet", "win.project-new")
@@ -650,6 +727,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         header.pack_start(self.delete_toggle)
         header.pack_start(self.image_toggle)
         header.pack_start(self.editor_toggle)
+        header.pack_start(self.format_revealer)
         header.pack_end(burger)
         header.pack_end(export)
 
@@ -744,6 +822,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         if active:
             self._run_js(
                 "document.designMode = 'on';"
+                # produire des balises (b/i) et non des styles en ligne
+                "document.execCommand('styleWithCSS', false, false);"
                 "document.body.style.outline = '3px dashed var(--accent)';"
                 "document.body.style.outlineOffset = '-3px';")
         else:
@@ -751,6 +831,25 @@ class ThemoWindow(Adw.ApplicationWindow):
                 "document.designMode = 'off';"
                 "document.body.style.outline = '';"
                 "document.body.style.outlineOffset = '';")
+
+    def _format_link(self, *_args):
+        entry = Gtk.Entry(placeholder_text="https://exemple.fr ou page.html",
+                          activates_default=True)
+        dialog = Adw.AlertDialog(
+            heading="Transformer en lien",
+            body="Adresse du lien pour le texte sélectionné dans l'aperçu.")
+        dialog.set_extra_child(entry)
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("ok", "Créer le lien")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            url = entry.get_text().strip()
+            if d.choose_finish(result) == "ok" and url:
+                self._run_js(f"window._themoLink({json.dumps(url)});")
+        dialog.choose(self, None, done)
 
     def _on_wysiwyg_toggled(self, btn):
         if btn.get_active():
@@ -761,10 +860,13 @@ class ThemoWindow(Adw.ApplicationWindow):
             if self.image_toggle.get_active():
                 self.image_toggle.set_active(False)
             self._set_design_mode(True)
+            self.format_revealer.set_reveal_child(True)
             self.toasts.add_toast(Adw.Toast(
-                title="Édition du texte activée — cliquez dans l'aperçu"))
+                title="Édition du texte activée — sélectionnez du texte "
+                      "puis mettez-le en forme, ou cliquez pour écrire"))
         else:
             self._set_design_mode(False)
+            self.format_revealer.set_reveal_child(False)
             self._load_page_into_editor()
 
     def _on_delete_toggled(self, btn):
@@ -983,6 +1085,10 @@ class ThemoWindow(Adw.ApplicationWindow):
         if self._loaded_page not in self.project.pages:
             return
         html = value.to_string()
+        # normaliser le balisage des raccourcis natifs (Ctrl+B/I) en éléments
+        # sémantiques, stylés par le design système
+        html = (html.replace("<b>", "<strong>").replace("</b>", "</strong>")
+                .replace("<i>", "<em>").replace("</i>", "</em>"))
         if not html.endswith("\n"):
             html += "\n"
         self.project.pages[self._loaded_page] = html

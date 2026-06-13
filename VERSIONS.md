@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.16.0 — Édition enrichie : formatage du texte et nouveaux blocs (13 juin 2026)
+
+**Description courte :** en édition WYSIWYG, une barre d'outils met le texte sélectionné en gras (`strong`), emphase (`em`) ou surligné (`mark`) et le transforme en lien ; deux nouveaux blocs rejoignent le menu d'insertion.
+
+**Explication commentée :**
+
+- *Formatage sémantique* — barre révélée en mode WYSIWYG : Gras → `<strong>`, Emphase → `<em>`, Surligner → `<mark>`, et Lien (via un dialogue d'adresse) → `<a href>`. Chaque bouton enveloppe la sélection, ou retire le formatage si la sélection chevauche déjà un tel élément (détection par ancêtre *et* descendants via `intersectsNode`, robuste au décalage des bornes dû au padding de `<mark>`).
+- *Raccourcis natifs* — Ctrl+B / Ctrl+I produisent des balises (`styleWithCSS` désactivé) normalisées en `<strong>` / `<em>` à la synchronisation. Aucune classe, aucun style en ligne.
+- *Nouveaux blocs* — « Appel à l'action » et « Liens sociaux » s'ajoutent au menu + (section « Dans le contenu »).
+
+---
+
 ## v1.15.0 — Accessibilité : badges de contraste et audit (13 juin 2026)
 
 **Description courte :** la barre latérale affiche le contraste WCAG des couleurs en direct, et un audit signale les principaux problèmes d'accessibilité des pages.
