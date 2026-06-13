@@ -7,11 +7,13 @@ Trois étages, sans aucune classe CSS :
   3. styles appliqués directement aux éléments HTML via un second template.
 """
 
+import re
 from datetime import date
 
 from tokens import (
     Config, FONT_STACKS, CONTAINERS, DENSITIES,
     color_scale, type_scale, spacing_scale, radius_scale, shadow_scale,
+    hex_to_rgb, _srgb_to_linear,
 )
 
 
@@ -953,3 +955,79 @@ def generate_css(cfg: Config) -> str:
     ]
 
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Contraste (WCAG) : résolution des couleurs sémantiques et ratios
+# ---------------------------------------------------------------------------
+
+_VAR_RE = re.compile(r"var\(--color-(\w+)-(\d+)\)")
+
+
+def resolve_semantic(cfg):
+    """Couleurs sémantiques résolues en hex, par thème : {theme: {role: hex}}.
+
+    Les références `var(--color-...)` sont remplacées par la couleur calculée
+    de la gamme correspondante ; les littéraux (#fff…) sont conservés.
+    """
+    scales = {"primary": color_scale(cfg.primary),
+              "secondary": color_scale(cfg.secondary),
+              "neutral": color_scale(cfg.primary, neutral=True)}
+    tmpl = SEMANTIC_TEMPLATES[cfg.semantic_template]
+    out = {}
+    for theme in ("light", "dark"):
+        resolved = {}
+        for role, value in tmpl[theme].items():
+            m = _VAR_RE.fullmatch(value)
+            if m:
+                resolved[role] = scales[m.group(1)][int(m.group(2))]
+            elif value.startswith("#"):
+                resolved[role] = value
+        out[theme] = resolved
+    return out
+
+
+def _luminance(hexcol):
+    r, g, b = (_srgb_to_linear(c) for c in hex_to_rgb(hexcol))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(fg, bg):
+    """Ratio de contraste WCAG entre deux couleurs hex (1 à 21)."""
+    a, b = _luminance(fg), _luminance(bg)
+    hi, lo = max(a, b), min(a, b)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+# Paires vérifiées (libellé, premier plan, fond, ratio minimal visé)
+CONTRAST_PAIRS = [
+    ("Texte courant", "text", "background", 4.5),
+    ("Texte atténué", "text-muted", "background", 4.5),
+    ("Liens", "link", "background", 4.5),
+    ("Texte des boutons", "on-accent", "accent", 4.5),
+    ("Accent sur le fond", "accent", "background", 3.0),
+]
+
+
+def contrast_report(cfg, theme):
+    """Pour chaque paire : (libellé, ratio, niveau, conforme).
+
+    Niveau : AAA (≥7), AA (≥4.5), AA gros/UI (≥3), insuffisant. `conforme`
+    indique si le ratio atteint le minimum visé par la paire.
+    """
+    colors = resolve_semantic(cfg)[theme]
+    rows = []
+    for label, fg, bg, minimum in CONTRAST_PAIRS:
+        if fg not in colors or bg not in colors:
+            continue
+        ratio = contrast_ratio(colors[fg], colors[bg])
+        if ratio >= 7:
+            level = "AAA"
+        elif ratio >= 4.5:
+            level = "AA"
+        elif ratio >= 3:
+            level = "AA gros/UI"
+        else:
+            level = "insuffisant"
+        rows.append((label, ratio, level, ratio >= minimum))
+    return rows

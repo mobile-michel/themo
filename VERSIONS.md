@@ -4,6 +4,17 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.15.0 — Accessibilité : badges de contraste et audit (13 juin 2026)
+
+**Description courte :** la barre latérale affiche le contraste WCAG des couleurs en direct, et un audit signale les principaux problèmes d'accessibilité des pages.
+
+**Explication commentée :**
+
+- *Badges de contraste* — un groupe « Contraste » montre, pour cinq paires (texte courant, texte atténué, liens, texte des boutons, accent sur le fond), le ratio et le niveau WCAG (AAA / AA / AA gros-UI / insuffisant), en vert si la cible est atteinte, sinon en rouge. Mise à jour en direct selon les couleurs, l'ambiance et le mode sombre (thème prévisualisé). Les couleurs sémantiques sont résolues en hex via les gammes OKLCH, puis le ratio de luminance WCAG est calculé (`css_gen.resolve_semantic`, `contrast_ratio`).
+- *Audit* — ☰ → *Vérifier l'accessibilité…* parcourt les pages et signale : images sans `alt`, `h1` absent ou multiple, niveaux de titres sautés, liens vides, et attributs `class` (contraires au principe sans-classe). Résultat groupé par page, ou confirmation si tout est conforme. Nouveau module `audit.py`, pur et sans dépendance.
+
+---
+
 ## v1.14.1 — La page d'accueil n'est plus dupliquée (13 juin 2026)
 
 **Description courte :** la page d'accueil n'est servie que comme `index.html` — fini le doublon `accueil.html`, et la navigation pointe vers `index.html`.

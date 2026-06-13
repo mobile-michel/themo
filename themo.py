@@ -45,7 +45,8 @@ except (ValueError, ImportError):
 
 from tokens import (Config, HEADING_FONTS, BODY_FONTS, CODE_FONTS,  # noqa: E402
                     RATIOS, CONTAINERS, DENSITIES, STYLE_PRESETS)
-from css_gen import generate_css, SEMANTIC_TEMPLATES, ELEMENT_TEMPLATES  # noqa: E402
+from css_gen import (generate_css, SEMANTIC_TEMPLATES,  # noqa: E402
+                     ELEMENT_TEMPLATES, contrast_report, CONTRAST_PAIRS)
 from pages import (MODELS, PROJECT_MODELS, MODEL_DESCRIPTIONS,  # noqa: E402
                    BLOCKS, insert_block, propagate_chrome,
                    nav_add_link, nav_remove_link, nav_rename_link,
@@ -53,6 +54,7 @@ from pages import (MODELS, PROJECT_MODELS, MODEL_DESCRIPTIONS,  # noqa: E402
 from project import Project, slugify  # noqa: E402
 import openverse  # noqa: E402
 import publish  # noqa: E402
+import audit  # noqa: E402
 
 APP_ID = "li.maillard.Themo"
 
@@ -321,6 +323,19 @@ class ThemoWindow(Adw.ApplicationWindow):
         dark.connect("notify::active", self._on_switch, "include_dark")
         self._setters["include_dark"] = dark.set_active
         grp.add(dark)
+        page.add(grp)
+
+        grp = Adw.PreferencesGroup(
+            title="Contraste",
+            description="Lisibilité (WCAG) du thème prévisualisé")
+        self._contrast_rows = []
+        for label, _fg, _bg, _min in CONTRAST_PAIRS:
+            row = Adw.ActionRow(title=label)
+            badge = Gtk.Label()
+            badge.add_css_class("numeric")
+            row.add_suffix(badge)
+            grp.add(row)
+            self._contrast_rows.append((row, badge))
         page.add(grp)
 
         grp = Adw.PreferencesGroup(
@@ -614,6 +629,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         sect.append("Réglages du site…", "win.site-settings")
         project_menu.append_section("Projet", sect)
         sect = Gio.Menu()
+        sect.append("Vérifier l'accessibilité…", "win.audit")
         sect.append("Exporter le CSS…", "win.export-css")
         sect.append("Exporter CSS + pages HTML…", "win.export-all")
         sect.append("Publier sur un serveur…", "win.publish")
@@ -1187,6 +1203,34 @@ class ThemoWindow(Adw.ApplicationWindow):
         dialog.set_child(view)
         dialog.present(self)
 
+    # -- Audit d'accessibilité -----------------------------------------------
+
+    def _audit(self, *_args):
+        issues = audit.lint_pages(self.project.pages)
+        if not issues:
+            self.toasts.add_toast(Adw.Toast(
+                title="Accessibilité : aucun problème détecté"))
+            return
+        by_page = {}
+        for name, msg in issues:
+            by_page.setdefault(name, []).append(msg)
+        dialog = Adw.Dialog(title="Accessibilité",
+                            content_width=520, content_height=480)
+        page = Adw.PreferencesPage()
+        for name, msgs in by_page.items():
+            grp = Adw.PreferencesGroup(title=name)
+            for msg in msgs:
+                row = Adw.ActionRow(title=msg)
+                row.add_prefix(Gtk.Image.new_from_icon_name(
+                    "dialog-warning-symbolic"))
+                grp.add(row)
+            page.add(grp)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(page)
+        dialog.set_child(view)
+        dialog.present(self)
+
     # -- Publication ----------------------------------------------------------
 
     def _load_secret(self, key):
@@ -1569,9 +1613,21 @@ class ThemoWindow(Adw.ApplicationWindow):
             GLib.source_remove(self._refresh_id)
         self._refresh_id = GLib.timeout_add(120, self._refresh)
 
+    def _update_contrast(self):
+        """Met à jour les badges de contraste (thème prévisualisé)."""
+        theme = "dark" if self.dark_toggle.get_active() else "light"
+        report = contrast_report(self.cfg, theme)
+        for (row, badge), (_label, ratio, level, ok) in zip(
+                self._contrast_rows, report):
+            badge.set_text(f"{ratio:.1f}:1 · {level}")
+            for css_class in ("success", "warning", "error"):
+                badge.remove_css_class(css_class)
+            badge.add_css_class("success" if ok else "error")
+
     def _refresh(self):
         self._refresh_id = 0
         css = generate_css(self.cfg)
+        self._update_contrast()
         name = self._current_page_name()
         # Thème forcé dans l'aperçu pour rester indépendant du thème système
         theme = "dark" if self.dark_toggle.get_active() else "light"
@@ -1887,6 +1943,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                          ("page-home", self._page_home),
                          ("page-meta", self._page_meta),
                          ("site-settings", self._site_settings),
+                         ("audit", self._audit),
                          ("publish", self._publish_dialog)):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
