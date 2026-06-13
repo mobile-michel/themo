@@ -549,6 +549,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         manage_menu.append("Renommer la page…", "win.page-rename")
         manage_menu.append("Supprimer la page…", "win.page-delete")
         manage_menu.append("Définir comme page d'accueil", "win.page-home")
+        manage_menu.append("Description de la page…", "win.page-meta")
         # Garde-fou : toutes les pages restent accessibles ici, même si
         # leur lien a disparu de la navigation.
         self.pages_list_menu = Gio.Menu()
@@ -610,6 +611,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         sect.append("Ouvrir un projet récent…", "win.project-recent")
         sect.append("Enregistrer", "win.project-save")
         sect.append("Enregistrer sous…", "win.project-save-as")
+        sect.append("Réglages du site…", "win.site-settings")
         project_menu.append_section("Projet", sect)
         sect = Gio.Menu()
         sect.append("Exporter le CSS…", "win.export-css")
@@ -1031,6 +1033,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         current = self._current_page_name()
         name = self._unique_page_name(f"{current} (copie)")
         self.project.pages[name] = self.project.pages[current]
+        if current in self.project.descriptions:
+            self.project.descriptions[name] = self.project.descriptions[current]
         self._sync_navigation_add(name)
         self._touch()
         self._show_page(name)
@@ -1062,6 +1066,9 @@ class ThemoWindow(Adw.ApplicationWindow):
                 for k, v in self.project.pages.items()}
             if self.project.home == current:
                 self.project.home = new
+            if current in self.project.descriptions:
+                self.project.descriptions[new] = \
+                    self.project.descriptions.pop(current)
             self._touch()
             self._show_page(new)
         dialog.choose(self, None, done)
@@ -1096,6 +1103,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             if d.choose_finish(result) != "delete":
                 return
             del self.project.pages[current]
+            self.project.descriptions.pop(current, None)
             for other in self.project.pages:
                 self.project.pages[other] = nav_remove_link(
                     self.project.pages[other], current)
@@ -1109,6 +1117,75 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._touch()
         self.toasts.add_toast(Adw.Toast(
             title=f"« {current} » est la page d'accueil (index.html)"))
+
+    def _page_meta(self, *_args):
+        name = self._current_page_name()
+        entry = Gtk.Entry(text=self.project.descriptions.get(name, ""),
+                          activates_default=True,
+                          placeholder_text="Résumé d'une phrase")
+        dialog = Adw.AlertDialog(
+            heading=f"Description de « {name} »",
+            body="Résumé d'une phrase pour les moteurs de recherche et les "
+                 "aperçus de partage. Vide : la description par défaut du "
+                 "site est utilisée.")
+        dialog.set_extra_child(entry)
+        dialog.add_response("cancel", "Annuler")
+        dialog.add_response("ok", "Valider")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+
+        def done(d, result):
+            if d.choose_finish(result) != "ok":
+                return
+            text = entry.get_text().strip()
+            if text:
+                self.project.descriptions[name] = text
+            else:
+                self.project.descriptions.pop(name, None)
+            self._touch()
+        dialog.choose(self, None, done)
+
+    # -- Réglages du site (SEO) ----------------------------------------------
+
+    def _site_settings(self, *_args):
+        site = self.project.site
+        dialog = Adw.Dialog(title="Réglages du site", content_width=480)
+        page = Adw.PreferencesPage()
+        grp = Adw.PreferencesGroup(
+            title="Métadonnées du site",
+            description="Insérées dans l'en-tête des pages exportées, pour "
+                        "le référencement et les partages.")
+        lang_row = Adw.EntryRow(title="Langue (code, ex. fr, en, de)")
+        lang_row.set_text(site.get("lang") or "fr")
+        grp.add(lang_row)
+        desc_row = Adw.EntryRow(title="Description par défaut")
+        desc_row.set_text(site.get("description") or "")
+        grp.add(desc_row)
+        base = self.project.base_url()
+        url_row = Adw.ActionRow(
+            title="Adresse du site",
+            subtitle=base or "définie à la publication — requise pour les "
+                             "URL canoniques et le sitemap")
+        grp.add(url_row)
+        page.add(grp)
+
+        def apply(*_a):
+            site["lang"] = lang_row.get_text().strip() or "fr"
+            site["description"] = desc_row.get_text().strip()
+            self._touch()
+            dialog.close()
+        button = Gtk.Button(label="Valider")
+        button.add_css_class("suggested-action")
+        button.connect("clicked", apply)
+        bar = Gtk.ActionBar()
+        bar.pack_end(button)
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(page)
+        view.add_bottom_bar(bar)
+        dialog.set_child(view)
+        dialog.present(self)
 
     # -- Publication ----------------------------------------------------------
 
@@ -1808,6 +1885,8 @@ class ThemoWindow(Adw.ApplicationWindow):
                          ("page-rename", self._page_rename),
                          ("page-delete", self._page_delete),
                          ("page-home", self._page_home),
+                         ("page-meta", self._page_meta),
+                         ("site-settings", self._site_settings),
                          ("publish", self._publish_dialog)):
             action = Gio.SimpleAction.new(name, None)
             action.connect("activate", cb)
@@ -1849,8 +1928,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         for name, content in publish.site_files(self.project).items():
             (folder / name).write_text(content, encoding="utf-8")
         self.toasts.add_toast(Adw.Toast(
-            title=f"CSS, {len(self.project.pages)} pages et index.html "
-                  f"exportés dans {folder.name}/"))
+            title=f"CSS, {len(self.project.pages)} pages, index.html et "
+                  f"fichiers SEO exportés dans {folder.name}/"))
 
 
 class ThemoApp(Adw.Application):

@@ -21,21 +21,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from css_gen import generate_css
-from pages import slugify, wrap_export
-
 NETLIFY_API = "https://api.netlify.com/api/v1"
 _HEADERS = {"User-Agent": "Themo (https://github.com/mobile-michel/themo)"}
 
 
 def site_files(project):
-    """Tous les fichiers du site à publier : nom -> contenu."""
-    files = {"design-system.css": generate_css(project.cfg)}
-    for name, body in project.pages.items():
-        files[slugify(name) + ".html"] = wrap_export(body, name)
-    home = project.home_page()
-    files["index.html"] = wrap_export(project.pages[home], home)
-    return files
+    """Tous les fichiers du site à publier (CSS, pages, index, favicon,
+    robots, sitemap) — construits par le projet."""
+    return project.web_files()
 
 
 # -- Netlify -----------------------------------------------------------------

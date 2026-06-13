@@ -18,7 +18,8 @@ from gi.repository import GLib
 
 from tokens import Config
 from css_gen import generate_css
-from pages import PAGES, wrap_export, slugify  # noqa: F401 (réexporté)
+from pages import (PAGES, wrap_export, slugify,  # noqa: F401 (réexporté)
+                   favicon_svg, robots_txt, sitemap_xml)
 
 _BODY_RE = re.compile(r"<body[^>]*>(.*)</body>", re.S | re.I)
 _TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
@@ -33,6 +34,8 @@ class Project:
         self.path = Path(path) if path else None
         self.home = None   # page d'accueil (index.html) ; défaut : la première
         self.publish = {}  # méthode et destination de publication
+        self.site = {"lang": "fr", "description": ""}  # métadonnées SEO
+        self.descriptions = {}  # description par page (nom -> texte)
 
     def home_page(self):
         """Nom de la page exportée aussi comme index.html."""
@@ -41,6 +44,54 @@ class Project:
     @property
     def name(self):
         return self.path.name if self.path else "Projet sans titre"
+
+    # -- Métadonnées et fichiers du site -------------------------------------
+
+    def base_url(self):
+        """Adresse publique du site (sans / final), si elle est connue."""
+        return (self.publish.get("url") or "").rstrip("/")
+
+    def page_meta(self, name):
+        """Métadonnées d'en-tête (SEO) pour la page `name`."""
+        base = self.base_url()
+        canonical = None
+        if base:
+            canonical = (base + "/" if name == self.home_page()
+                         else f"{base}/{slugify(name)}.html")
+        return {
+            "lang": self.site.get("lang") or "fr",
+            "description": (self.descriptions.get(name)
+                            or self.site.get("description") or ""),
+            "canonical": canonical,
+            "theme_color": self.cfg.primary,
+            "favicon": "favicon.svg",
+        }
+
+    def site_urls(self):
+        """URL absolues du site (accueil à la racine), pour le sitemap."""
+        base = self.base_url()
+        if not base:
+            return []
+        home = self.home_page()
+        urls = [base + "/"]
+        urls += [f"{base}/{slugify(n)}.html" for n in self.pages if n != home]
+        return urls
+
+    def web_files(self):
+        """Tous les fichiers du site publiable : nom -> contenu."""
+        files = {"design-system.css": generate_css(self.cfg)}
+        for name, body in self.pages.items():
+            files[slugify(name) + ".html"] = wrap_export(
+                body, name, self.page_meta(name))
+        home = self.home_page()
+        files["index.html"] = wrap_export(
+            self.pages[home], home, self.page_meta(home))
+        files["favicon.svg"] = favicon_svg(self.cfg.primary)
+        files["robots.txt"] = robots_txt(self.base_url())
+        urls = self.site_urls()
+        if urls:
+            files["sitemap.xml"] = sitemap_xml(urls)
+        return files
 
     # -- Enregistrement ------------------------------------------------------
 
@@ -69,23 +120,22 @@ class Project:
         for key, value in self.publish.items():
             if value:
                 kf.set_string("publish", key, value)
+        kf.set_string("site", "lang", self.site.get("lang") or "fr")
+        kf.set_string("site", "description",
+                      self.site.get("description") or "")
+        for name, desc in self.descriptions.items():
+            if desc and name in self.pages:
+                kf.set_string("descriptions", slugify(name), desc)
         kf.save_to_file(str(self.path / "themo.conf"))
 
-        (self.path / "design-system.css").write_text(
-            generate_css(self.cfg), encoding="utf-8")
-
-        keep = {"index.html"}
-        for name, body in self.pages.items():
-            filename = slugify(name) + ".html"
-            keep.add(filename)
-            (self.path / filename).write_text(
-                wrap_export(body, name), encoding="utf-8")
-        # la page d'accueil est doublée en index.html, attendu des serveurs
-        home = self.home_page()
-        (self.path / "index.html").write_text(
-            wrap_export(self.pages[home], home), encoding="utf-8")
-        # retirer les fichiers des pages supprimées ou renommées
+        # tous les fichiers du site (css, pages, index, favicon, robots,
+        # sitemap), construits une seule fois ici et à la publication
+        files = self.web_files()
+        for filename, content in files.items():
+            (self.path / filename).write_text(content, encoding="utf-8")
+        # retirer les pages orphelines (supprimées ou renommées)
         if was_project:
+            keep = set(files)
             for f in self.path.glob("*.html"):
                 if f.name not in keep:
                     f.unlink()
@@ -139,6 +189,19 @@ class Project:
                     "ftp_host", "ftp_user", "ftp_path", "ftp_secure"):
             try:
                 project.publish[key] = kf.get_string("publish", key)
+            except GLib.Error:
+                pass
+        for key in ("lang", "description"):
+            try:
+                project.site[key] = kf.get_string("site", key)
+            except GLib.Error:
+                pass
+        # descriptions par page : indexées par slug dans le fichier,
+        # réassociées au nom de chaque page
+        for name in pages:
+            try:
+                project.descriptions[name] = kf.get_string(
+                    "descriptions", slugify(name))
             except GLib.Error:
                 pass
         return project

@@ -7,6 +7,7 @@ appliqués aux éléments HTML par la feuille générée.
 
 import re
 import unicodedata
+from html import escape
 
 
 def slugify(name):
@@ -1074,11 +1075,62 @@ def wrap_preview(body: str, css: str, theme: str | None = None) -> str:
             f'<style>\n{css}\n</style>\n</head>\n<body>\n{body}</body>\n</html>\n')
 
 
-def wrap_export(body: str, title: str) -> str:
-    """Page complète liée à design-system.css, pour l'export."""
-    return (f'<!DOCTYPE html>\n<html lang="fr">\n<head>\n'
-            f'<meta charset="utf-8">\n'
-            f'<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-            f'<title>{title}</title>\n'
-            f'<link rel="stylesheet" href="design-system.css">\n'
-            f'</head>\n<body>\n{body}</body>\n</html>\n')
+def wrap_export(body: str, title: str, meta: dict | None = None) -> str:
+    """Page complète liée à design-system.css, pour l'export.
+
+    `meta` (facultatif) enrichit l'en-tête pour le référencement : langue,
+    description, URL canonique, Open Graph, theme-color, favicon. Toutes les
+    valeurs sont échappées.
+    """
+    meta = meta or {}
+    lang = meta.get("lang") or "fr"
+    head = [
+        '<meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        f"<title>{escape(title)}</title>",
+    ]
+    desc = meta.get("description")
+    if desc:
+        head.append(f'<meta name="description" content="{escape(desc)}">')
+    canonical = meta.get("canonical")
+    if canonical:
+        head.append(f'<link rel="canonical" href="{escape(canonical)}">')
+    if meta.get("theme_color"):
+        head.append(
+            f'<meta name="theme-color" content="{escape(meta["theme_color"])}">')
+    # Open Graph (partages sur les réseaux)
+    for prop, value in (("og:type", "website"), ("og:title", title),
+                        ("og:description", desc), ("og:url", canonical)):
+        if value:
+            head.append(
+                f'<meta property="{prop}" content="{escape(value)}">')
+    if meta.get("favicon"):
+        head.append(f'<link rel="icon" href="{escape(meta["favicon"])}">')
+    head.append('<link rel="stylesheet" href="design-system.css">')
+    return (f'<!DOCTYPE html>\n<html lang="{escape(lang)}">\n<head>\n'
+            + "\n".join(head)
+            + f'\n</head>\n<body>\n{body}</body>\n</html>\n')
+
+
+def favicon_svg(color: str) -> str:
+    """Favicon minimal : carré arrondi à la couleur primaire (SVG)."""
+    return (
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+        f"<rect width='32' height='32' rx='7' fill='{color}'/></svg>\n")
+
+
+def robots_txt(base_url: str | None) -> str:
+    """robots.txt permissif, avec lien vers le sitemap si l'URL est connue."""
+    lines = ["User-agent: *", "Disallow:"]
+    if base_url:
+        lines += ["", f"Sitemap: {base_url}/sitemap.xml"]
+    return "\n".join(lines) + "\n"
+
+
+def sitemap_xml(urls) -> str:
+    """sitemap.xml à partir d'une liste d'URL absolues."""
+    entries = "".join(
+        f"  <url><loc>{escape(u)}</loc></url>\n" for u in urls)
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + entries + "</urlset>\n")

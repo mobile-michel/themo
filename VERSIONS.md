@@ -4,6 +4,19 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.13.0 — Référencement : en-tête SEO, sitemap et favicon (13 juin 2026)
+
+**Description courte :** les pages exportées et publiées portent désormais un en-tête complet pour le référencement (description, langue, URL canonique, Open Graph, theme-color, favicon), et le site reçoit `favicon.svg`, `robots.txt` et `sitemap.xml`.
+
+**Explication commentée :**
+
+- *En-tête enrichi* — `wrap_export` ajoute une langue configurable (`<html lang>`), `<meta name="description">`, `<link rel="canonical">`, `theme-color` (couleur primaire), les balises Open Graph (type, titre, description, URL) et le lien favicon ; le `<title>` et toutes les valeurs sont **échappés** (corrige un risque sur les noms contenant `&` ou `<`).
+- *Réglages* — ☰ → *Réglages du site…* (langue, description par défaut) et ⋮ → *Description de la page…* (description propre à chaque page, sinon celle du site). L'URL canonique et le sitemap réutilisent l'adresse publique saisie à la publication ; sans elle, ils sont simplement omis.
+- *Fichiers de site* — `favicon.svg` (carré arrondi à la couleur primaire), `robots.txt` (avec lien Sitemap si l'URL est connue) et `sitemap.xml` (accueil à la racine, chaque page une seule fois, sans doublon `index.html`).
+- *Architecture* — un point de vérité unique, `Project.web_files()`, construit tous les fichiers du site (CSS, pages, index, favicon, robots, sitemap) ; il est partagé par l'enregistrement, l'export « CSS + pages » et la publication. `themo.conf` gagne les sections `[site]` et `[descriptions]` (indexées par slug) ; les descriptions suivent renommages, suppressions et duplications de pages.
+
+---
+
 ## v1.12.0 — Publication en ligne, page d'accueil et projets récents (13 juin 2026)
 
 **Description courte :** un site se publie désormais directement depuis Thémo (Netlify, serveur SSH/rsync ou FTP/FTPS), la page d'accueil est exportée comme `index.html`, les projets récents sont accessibles au lancement et depuis le menu, et l'application avertit avant de fermer un projet non enregistré.
