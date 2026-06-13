@@ -88,12 +88,22 @@ class Project:
         for name, body in self.pages.items():
             bodies[name], imgs = externalize(body)
             images.update(imgs)
-        for name in self.pages:
-            files[slugify(name) + ".html"] = wrap_export(
-                bodies[name], name, self.page_meta(name))
         home = self.home_page()
+        # La page d'accueil n'est servie que comme index.html (pas de
+        # doublon « accueil.html ») ; les liens qui la visent par son slug
+        # pointent vers index.html.
+        home_link = f'href="{slugify(home)}.html"'
+
+        def to_index(body):
+            return body.replace(home_link, 'href="index.html"')
+
+        for name in self.pages:
+            if name == home:
+                continue
+            files[slugify(name) + ".html"] = wrap_export(
+                to_index(bodies[name]), name, self.page_meta(name))
         files["index.html"] = wrap_export(
-            bodies[home], home, self.page_meta(home))
+            to_index(bodies[home]), home, self.page_meta(home))
         files["favicon.svg"] = favicon_svg(self.cfg.primary)
         files["robots.txt"] = robots_txt(self.base_url())
         urls = self.site_urls()
@@ -188,16 +198,36 @@ class Project:
                 pass  # clé absente ou invalide : la valeur par défaut reste
 
         pages = {}
+        index_entry = None
         for f in sorted(path.glob("*.html")):
-            if f.name == "index.html":
-                continue  # doublon généré de la page d'accueil
             text = f.read_text(encoding="utf-8")
             body = _BODY_RE.search(text)
             title = _TITLE_RE.search(text)
             name = title.group(1).strip() if title else f.stem
-            pages[name] = (body.group(1).strip() + "\n") if body else text
+            content = (body.group(1).strip() + "\n") if body else text
+            if f.name == "index.html":
+                index_entry = (name, content)
+                continue
+            pages[name] = content
+        # la page d'accueil n'existe que comme index.html (schéma courant) ;
+        # un ancien accueil.html éventuel l'emporte (et sera nettoyé au save)
+        if index_entry and index_entry[0] not in pages:
+            pages[index_entry[0]] = index_entry[1]
         if not pages:
             pages = dict(PAGES)
+
+        home_name = None
+        try:
+            home_name = kf.get_string("project", "home")
+        except GLib.Error:
+            pass
+        home = home_name if home_name in pages else next(iter(pages))
+        # restaurer le modèle « liens par slug » en mémoire : les liens vers
+        # index.html redeviennent le slug de la page d'accueil (l'inverse de
+        # l'export), pour l'aperçu et la synchronisation de navigation
+        slug_link = f'href="{slugify(home)}.html"'
+        pages = {n: b.replace('href="index.html"', slug_link)
+                 for n, b in pages.items()}
 
         # réinjecter les images du dossier images/ comme data URI (forme
         # de travail en mémoire), l'inverse de l'export
@@ -209,10 +239,7 @@ class Project:
                 pages = {n: internalize(b, images) for n, b in pages.items()}
 
         project = cls(cfg, pages, path)
-        try:
-            project.home = kf.get_string("project", "home")
-        except GLib.Error:
-            pass
+        project.home = home_name
         for key in ("method", "ssh_dest", "netlify_site", "url",
                     "ftp_host", "ftp_user", "ftp_path", "ftp_secure"):
             try:

@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.14.1 — La page d'accueil n'est plus dupliquée (13 juin 2026)
+
+**Description courte :** la page d'accueil n'est servie que comme `index.html` — fini le doublon `accueil.html`, et la navigation pointe vers `index.html`.
+
+**Explication commentée :**
+
+- *Correctif* — auparavant la page d'accueil était exportée deux fois (sous son slug `accueil.html` *et* en `index.html`), et la navigation, générée par slug, pointait vers `accueil.html`. Désormais l'accueil n'est écrit qu'en `index.html`, et les liens qui le visent sont réécrits vers `index.html`.
+- *Transformation aux frontières* — comme pour les images, le modèle « liens par slug » reste intact en mémoire (aperçu, navigation au clic, synchronisation de nav inchangés) : `web_files` réécrit accueil→index à l'export, `load` fait l'inverse au chargement. La désignation de la page d'accueil reste dynamique (changer d'accueil déplace simplement le `index.html`).
+- *Migration* — un ancien projet contenant `accueil.html` et `index.html` est dédupliqué au chargement, et le `accueil.html` redondant est supprimé au prochain enregistrement.
+
+---
+
 ## v1.14.0 — Images en fichiers : pages plus légères et indexables (13 juin 2026)
 
 **Description courte :** les photos (Openverse) ne sont plus intégrées en base64 dans le HTML mais enregistrées comme fichiers dans `images/`, référencées en relatif avec `loading="lazy"`, dimensions et `alt` — pages plus légères, cacheables et indexables.
