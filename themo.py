@@ -220,6 +220,8 @@ class ThemoWindow(Adw.ApplicationWindow):
         self._illustrate_token = None    # invalidation des illustrations
         self._image_search_token = None  # invalidation des recherches
         self._close_after_save = False   # fermeture demandée via le dialogue
+        self._history = []   # instantanés pour annuler (opérations de structure)
+        self._redo = []      # instantanés pour rétablir
 
         self._restore_window_state()
         self.connect("close-request", self._on_close_request)
@@ -698,6 +700,10 @@ class ThemoWindow(Adw.ApplicationWindow):
 
         project_menu = Gio.Menu()
         sect = Gio.Menu()
+        sect.append("Annuler", "win.undo")
+        sect.append("Rétablir", "win.redo")
+        project_menu.append_section("Édition", sect)
+        sect = Gio.Menu()
         sect.append("Nouveau projet", "win.project-new")
         sect.append("Ouvrir un projet…", "win.project-open")
         sect.append("Ouvrir un projet récent…", "win.project-recent")
@@ -811,6 +817,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         if btn.get_active():
             self._load_page_into_editor()
         self.editor_revealer.set_reveal_child(btn.get_active())
+        self._update_history_actions()
 
     # -- Édition WYSIWYG dans l'aperçu ---------------------------------------
 
@@ -868,6 +875,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             self._set_design_mode(False)
             self.format_revealer.set_reveal_child(False)
             self._load_page_into_editor()
+        self._update_history_actions()
 
     def _on_delete_toggled(self, btn):
         if btn.get_active():
@@ -884,13 +892,18 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _on_block_removed(self, _ucm, value):
         if self._loaded_page not in self.project.pages:
             return
+        self._push_history()
         html = value.to_string()
         if not html.endswith("\n"):
             html += "\n"
         self.project.pages[self._loaded_page] = html
         self._touch()
         self._load_page_into_editor()
-        self.toasts.add_toast(Adw.Toast(title="Bloc supprimé"))
+        toast = Adw.Toast(title="Bloc supprimé")
+        toast.set_button_label("Annuler")
+        toast.connect("button-clicked", lambda *_a: self._undo())
+        toast.set_timeout(6)
+        self.toasts.add_toast(toast)
 
     # -- Remplacement d'images (Openverse) ------------------------------------
 
@@ -1019,6 +1032,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         def activated(_flow, child):
             data, ctype, title = results[child.get_index()]
             dialog.close()
+            self._push_history()
             self._replace_page_image(page, index, data, ctype, title)
             self.toasts.add_toast(Adw.Toast(title="Image remplacée"))
         flow.connect("child-activated", activated)
@@ -1136,6 +1150,7 @@ class ThemoWindow(Adw.ApplicationWindow):
             name = self._unique_page_name(
                 entry.get_text().strip() or "Nouvelle page")
             model = list(MODELS)[models.get_selected()]
+            self._push_history()
             self.project.pages[name] = MODELS[model]
             self._sync_navigation_add(name)
             self._touch()
@@ -1154,6 +1169,7 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _page_duplicate(self, *_args):
         current = self._current_page_name()
         name = self._unique_page_name(f"{current} (copie)")
+        self._push_history()
         self.project.pages[name] = self.project.pages[current]
         if current in self.project.descriptions:
             self.project.descriptions[name] = self.project.descriptions[current]
@@ -1183,6 +1199,7 @@ class ThemoWindow(Adw.ApplicationWindow):
                 self.toasts.add_toast(Adw.Toast(
                     title=f"Une page « {new} » existe déjà"))
                 return
+            self._push_history()
             self.project.pages = {
                 (new if k == current else k): nav_rename_link(v, current, new)
                 for k, v in self.project.pages.items()}
@@ -1198,6 +1215,7 @@ class ThemoWindow(Adw.ApplicationWindow):
     def _block_insert(self, _action, param):
         name = param.get_string()
         current = self._current_page_name()
+        self._push_history()
         self.project.pages[current] = insert_block(
             self.project.pages[current], name)
         self._touch()
@@ -1224,6 +1242,7 @@ class ThemoWindow(Adw.ApplicationWindow):
         def done(d, result):
             if d.choose_finish(result) != "delete":
                 return
+            self._push_history()
             del self.project.pages[current]
             self.project.descriptions.pop(current, None)
             for other in self.project.pages:
@@ -1670,6 +1689,51 @@ class ThemoWindow(Adw.ApplicationWindow):
                       "la destination de publication"))
         return False
 
+    # -- Annuler / Rétablir (opérations de structure) ------------------------
+
+    def _snapshot(self):
+        return (dict(self.project.pages), dict(self.project.descriptions),
+                self.project.home, self._current_page)
+
+    def _push_history(self):
+        """À appeler avant une opération de structure (bloc, image, page)."""
+        self._history.append(self._snapshot())
+        del self._history[:-50]  # borne raisonnable
+        self._redo.clear()
+        self._update_history_actions()
+
+    def _restore(self, snap):
+        pages, descriptions, home, current = snap
+        self.project.pages = dict(pages)
+        self.project.descriptions = dict(descriptions)
+        self.project.home = home
+        self._current_page = current
+        self._loaded_page = None  # forcer un rechargement complet de l'aperçu
+        self._touch()
+        self._show_page(current)
+
+    def _undo(self, *_args):
+        if not self._history:
+            return
+        self._redo.append(self._snapshot())
+        self._restore(self._history.pop())
+        self._update_history_actions()
+
+    def _redo_last(self, *_args):
+        if not self._redo:
+            return
+        self._history.append(self._snapshot())
+        self._restore(self._redo.pop())
+        self._update_history_actions()
+
+    def _update_history_actions(self):
+        # désactivé pendant l'édition de texte : Ctrl+Z revient alors à
+        # l'annulation native de l'éditeur HTML ou de l'aperçu WYSIWYG
+        busy = (self.editor_toggle.get_active()
+                or self.wysiwyg_toggle.get_active())
+        self._undo_action.set_enabled(bool(self._history) and not busy)
+        self._redo_action.set_enabled(bool(self._redo) and not busy)
+
     # -- Réactions aux changements -------------------------------------------
 
     def _touch(self):
@@ -2058,6 +2122,15 @@ class ThemoWindow(Adw.ApplicationWindow):
                                       GLib.VariantType.new("s"))
         action.connect("activate", self._block_insert)
         self.add_action(action)
+        # annuler / rétablir (désactivés tant qu'il n'y a rien à faire)
+        self._undo_action = Gio.SimpleAction.new("undo", None)
+        self._undo_action.set_enabled(False)
+        self._undo_action.connect("activate", self._undo)
+        self.add_action(self._undo_action)
+        self._redo_action = Gio.SimpleAction.new("redo", None)
+        self._redo_action.set_enabled(False)
+        self._redo_action.connect("activate", self._redo_last)
+        self.add_action(self._redo_action)
         # action à état : la page courante est cochée dans le menu
         self._page_show_action = Gio.SimpleAction.new_stateful(
             "page-show", GLib.VariantType.new("s"),
@@ -2108,6 +2181,8 @@ class ThemoApp(Adw.Application):
         self.set_accels_for_action("win.project-save", ["<Control>s"])
         self.set_accels_for_action("win.project-open", ["<Control>o"])
         self.set_accels_for_action("win.page-add", ["<Control>n"])
+        self.set_accels_for_action("win.undo", ["<Control>z"])
+        self.set_accels_for_action("win.redo", ["<Control><Shift>z"])
 
     def do_activate(self):
         win = self.get_active_window()

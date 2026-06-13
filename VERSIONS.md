@@ -4,6 +4,18 @@ Les versions sont ajoutées ici une fois validées, de la plus récente à la pl
 
 ---
 
+## v1.17.0 — Annuler / Rétablir les opérations de structure (13 juin 2026)
+
+**Description courte :** une pile multi-niveaux annule et rétablit les opérations de structure (blocs, images, pages), sans gêner l'annulation native des éditeurs de texte.
+
+**Explication commentée :**
+
+- *Portée* — insertion et suppression de bloc, remplacement d'image, ajout / duplication / renommage / suppression de page. Chaque instantané capture pages, descriptions, page d'accueil et page courante (borné à 50 niveaux).
+- *Accès* — ☰ → Édition → Annuler / Rétablir, ou **Ctrl+Z / Ctrl+Maj+Z** ; grisés quand il n'y a rien à faire. Après une suppression de bloc, un toast propose « Annuler » en un clic.
+- *Cohabitation avec les éditeurs* — l'édition de texte garde l'annulation native de GtkSourceView (éditeur HTML) et de designMode (WYSIWYG) ; l'annulation applicative est désactivée tant que l'un de ces modes est actif, pour que Ctrl+Z y reste local.
+
+---
+
 ## v1.16.0 — Édition enrichie : formatage du texte et nouveaux blocs (13 juin 2026)
 
 **Description courte :** en édition WYSIWYG, une barre d'outils met le texte sélectionné en gras (`strong`), emphase (`em`) ou surligné (`mark`) et le transforme en lien ; deux nouveaux blocs rejoignent le menu d'insertion.
