@@ -30,7 +30,7 @@ Un parcours guidé pas à pas est disponible dans [TUTORIEL.md](TUTORIEL.md).
 python3 themo.py
 ```
 
-Dépendances (présentes sur la plupart des distributions avec GNOME) : `python3-gi`, GTK 4, libadwaita ≥ 1.5, WebKitGTK 6.0 et GtkSourceView 5 (`gir1.2-webkit-6.0` et `gir1.2-gtksource-5` sous Debian/Ubuntu).
+Dépendances (présentes sur la plupart des distributions avec GNOME) : `python3-gi`, GTK 4, libadwaita ≥ 1.5, WebKitGTK 6.0 et GtkSourceView 5 (`gir1.2-webkit-6.0` et `gir1.2-gtksource-5` sous Debian/Ubuntu). Pour la publication : `rsync` (méthode SSH) et, pour conserver jeton et mots de passe dans le trousseau, libsecret (`gir1.2-secret-1`) — à défaut, ils sont stockés dans un fichier local en 0600. La publication FTP/FTPS et Netlify n'utilise que la bibliothèque standard de Python.
 
 Pour l'avoir dans le menu d'applications (le script injecte le chemin du dépôt dans le lanceur) :
 
@@ -40,10 +40,11 @@ Pour l'avoir dans le menu d'applications (le script injecte le chemin du dépôt
 
 ## Utilisation
 
-- Au démarrage (et via ☰ → Nouveau projet), un **écran d'accueil** propose des **modèles de projet** complets — Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel, Page vide — avec vignette, description et nombre de pages. Choisir un modèle applique d'office le style graphique et l'ambiance assortis. La case **« Illustrer avec des photos libres de droits (Openverse) »**, cochée par défaut, remplace les images de remplissage par des photos CC0 trouvées selon les mots-clés de chaque emplacement, téléchargées puis embarquées dans les pages ; décochée (ou hors ligne), les placeholders SVG restent en place.
+- Au démarrage (et via ☰ → Nouveau projet), un **écran d'accueil** propose des **modèles de projet** complets — Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel, Page vide — avec vignette, description et nombre de pages. Choisir un modèle applique d'office le style graphique et l'ambiance assortis. La case **« Illustrer avec des photos libres de droits (Openverse) »**, cochée par défaut, remplace les images de remplissage par des photos CC0 trouvées selon les mots-clés de chaque emplacement, téléchargées puis embarquées dans les pages ; décochée (ou hors ligne), les placeholders SVG restent en place. Tant qu'aucun modèle n'est choisi, l'aperçu montre un canevas vierge (et non un projet de démonstration).
+- L'écran d'accueil liste aussi les **projets récents** (avec un bouton « En ligne » vers le site publié, le cas échéant) et un bouton **Ouvrir un projet…**. Les récents restent accessibles à tout moment par ☰ → **Ouvrir un projet récent…**
 - Le style graphique, tout en haut, prérègle l'ensemble des tokens selon son caractère (Moderne, Classique, Minimal, Éditorial, Galerie, Chaleureux, Festif, Officiel) ; chaque token reste ensuite ajustable librement, et le bouton de réinitialisation réaligne le tout sur le style courant.
 - La barre latérale modifie les tokens, l'aperçu se met à jour en direct.
-- Le nom de la **page courante** s'affiche en haut de l'aperçu ; on passe de page en page par les liens de la nav, ou par la section « Aller à la page » du menu ⋮ (page courante cochée). Ce menu permet aussi d'**ajouter** (depuis un modèle de page), **dupliquer**, **renommer** et **supprimer** des pages. Le bouton lune bascule clair/sombre.
+- Le nom de la **page courante** s'affiche en haut de l'aperçu ; on passe de page en page par les liens de la nav, ou par la section « Aller à la page » du menu ⋮ (page courante cochée). Ce menu permet aussi d'**ajouter** (depuis un modèle de page), **dupliquer**, **renommer**, **supprimer** des pages, et **définir la page d'accueil** (celle qui sera exportée et publiée comme `index.html`). Le bouton lune bascule clair/sombre.
 - La **navigation principale est tenue à jour automatiquement** : ajouter, dupliquer, renommer ou supprimer une page répercute le lien correspondant dans la nav d'en-tête de toutes les pages (identifié par son `href` en slug) ; la page créée reçoit une nav complète avec sa propre entrée marquée `aria-current="page"`. Les liens personnalisés (`href="#"`, liens externes) ne sont jamais touchés.
 - Les **liens fonctionnent dans l'aperçu** : un clic sur un lien interne (`page.html`) bascule l'aperçu sur la page correspondante du projet, un lien externe (`http…`, `mailto:`) s'ouvre dans l'application par défaut, et les ancres (`#…`) défilent normalement. Dans les pages exportées, les mêmes liens fonctionnent tels quels puisque les fichiers existent côte à côte.
 - Le bouton crayon ouvre l'**éditeur HTML** de la page courante (GtkSourceView, coloration syntaxique) ; l'aperçu se met à jour pendant la frappe. Seul le corps de la page s'édite — et pour rester fidèle au design système, n'utilisez pas d'attribut `class`.
@@ -52,8 +53,9 @@ Pour l'avoir dans le menu d'applications (le script injecte le chemin du dépôt
 - Le bouton **image** active le **remplacement d'images** : cliquez une image dans l'aperçu, un dialogue prérempli avec ses mots-clés présente une grille de photos CC0 (Openverse) ; un clic la remplace, embarquée dans la page.
 - L'**en-tête et le pied de page sont communs à tout le site** : les modifier sur une page (texte de la marque, pied…) se répercute sur toutes les autres, en préservant la mise en évidence `aria-current` propre à chacune.
 - Le bouton d'**édition du texte** (curseur de sélection) rend l'aperçu directement éditable : cliquez et tapez dans la page, un liseré pointillé signale le mode actif. Les modifications sont synchronisées au fil de la frappe, et changer un token pendant l'édition met à jour les styles sans recharger la page. Ce mode est réservé au texte : pour la structure (ajouter des sections, des tableaux…), passez par l'éditeur HTML — les deux modes sont exclusifs. À noter : WebKit normalise le balisage de la page éditée (indentation perdue).
-- Le travail s'organise en **projet** : un dossier contenant `themo.conf` (tokens, format INI), `design-system.css` et une page HTML complète par page du projet — des fichiers ordinaires, utilisables tels quels. Menu ☰ : Nouveau / Ouvrir / Enregistrer (Ctrl+S) / Enregistrer sous… Utilisez un dossier dédié par projet.
-- Menu ☰ → **Exporter le CSS…** : écrit `design-system.css` seul ; **Exporter CSS + pages HTML…** : écrit aussi toutes les pages du projet.
+- Le travail s'organise en **projet** : un dossier contenant `themo.conf` (tokens, format INI), `design-system.css`, une page HTML complète par page du projet et un `index.html` (copie de la page d'accueil) — des fichiers ordinaires, utilisables tels quels. Menu ☰ : Nouveau / Ouvrir / Ouvrir un projet récent / Enregistrer (Ctrl+S) / Enregistrer sous… Utilisez un dossier dédié par projet. Fermer avec des modifications non enregistrées demande confirmation (Annuler / Quitter sans enregistrer / Enregistrer).
+- Menu ☰ → **Exporter le CSS…** : écrit `design-system.css` seul ; **Exporter CSS + pages HTML…** : écrit aussi toutes les pages du projet et l'`index.html`.
+- Menu ☰ → **Publier sur un serveur…** : met le site en ligne directement depuis Thémo, vers **Netlify** (un jeton d'accès personnel suffit, le site est créé au premier envoi), un **serveur SSH** (rsync, authentification par clé) ou en **FTP / FTPS** (identifiants d'hébergement mutualisé classique ; FTPS chiffré par défaut, dossier distant créé au besoin). La destination est mémorisée par projet ; le jeton et les mots de passe sont conservés dans le trousseau. Une aide intégrée détaille les données à fournir pour chaque méthode, et un bouton « Ouvrir » mène au site en ligne après publication.
 
 Pour forcer un thème dans vos pages : `<html data-theme="dark">` ou `<html data-theme="light">` ; sans attribut, le thème suit le système.
 
@@ -65,8 +67,9 @@ Héro pleine largeur : placez une `<section>` directement dans `<body>`, avant `
 - `tokens.py` — calculs des tokens dérivés (OKLCH, échelles), préréglages
 - `css_gen.py` — templates sémantiques + éléments, assemblage du CSS
 - `pages.py` — modèles de pages et de projets HTML (sans classes)
-- `project.py` — projet sur disque : tokens (INI) + pages HTML
+- `project.py` — projet sur disque : tokens (INI) + pages HTML + index.html
 - `openverse.py` — recherche de photos CC0 (API Openverse), embarquées en data URI
+- `publish.py` — publication du site (Netlify, SSH/rsync, FTP/FTPS)
 - `themo.desktop` — lanceur pour le menu d'applications
 
 ## Applications comparables

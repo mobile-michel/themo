@@ -1,6 +1,6 @@
 # Tutoriel Thémo
 
-Ce tutoriel vous guide pas à pas : vous allez créer le design système d'un petit studio fictif, composer un site de trois pages sans écrire une seule classe CSS, puis exporter le tout. Comptez une vingtaine de minutes.
+Ce tutoriel vous guide pas à pas : vous allez créer le design système d'un petit studio fictif, composer un site de trois pages sans écrire une seule classe CSS, puis l'exporter et le publier en ligne. Comptez une vingtaine de minutes.
 
 ## Sommaire
 
@@ -12,8 +12,9 @@ Ce tutoriel vous guide pas à pas : vous allez créer le design système d'un pe
 6. [Composer une page avec les blocs](#6-composer-une-page-avec-les-blocs)
 7. [Éditer le contenu](#7-éditer-le-contenu)
 8. [Enregistrer le projet](#8-enregistrer-le-projet)
-9. [Utiliser le CSS exporté](#9-utiliser-le-css-exporté)
-10. [Référence rapide](#10-référence-rapide)
+9. [Publier le site en ligne](#9-publier-le-site-en-ligne)
+10. [Utiliser le CSS exporté](#10-utiliser-le-css-exporté)
+11. [Référence rapide](#11-référence-rapide)
 
 ---
 
@@ -33,6 +34,8 @@ Pour ajouter Thémo au menu d'applications :
 ```bash
 ./install.sh
 ```
+
+Optionnel, pour la publication (section 9) : `rsync` si vous publiez par SSH, et `gir1.2-secret-1` pour conserver jetons et mots de passe dans le trousseau (sinon ils sont stockés dans un fichier local protégé). La publication Netlify et FTP/FTPS ne demande rien de plus.
 
 > **Note Ubuntu ≥ 24.04** — le système restreint les espaces de noms non privilégiés, ce qui bloque le bac à sable interne de WebKit. Thémo le détecte et le désactive automatiquement ; c'est sans conséquence, l'aperçu ne rendant que du HTML généré localement.
 
@@ -54,9 +57,9 @@ La fenêtre se divise en deux :
 | ⋮ | Gérer les pages, aller à une page |
 | + | Insérer un bloc dans la page |
 | Enregistrer | Enregistrer le projet (Ctrl+S) |
-| ☰ | Projet (nouveau, ouvrir, enregistrer sous) et export |
+| ☰ | Projet (nouveau, ouvrir, ouvrir récent, enregistrer sous), export et publication |
 
-Au lancement, un **écran d'accueil** propose de démarrer depuis un modèle de projet : Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel ou Page vide — chaque carte montre un schéma du modèle, sa description et son nombre de pages. Choisir un modèle applique d'office le style graphique assorti, et la case « Illustrer avec des photos libres de droits (Openverse) » remplace les images de remplissage par de vraies photos CC0 (décochez-la pour rester hors ligne). On retrouve le même écran via ☰ → *Nouveau projet*, et Échap le referme sans rien changer.
+Au lancement, un **écran d'accueil** propose de démarrer depuis un modèle de projet : Démonstration, Blog, Portfolio, Personnel, Événement, Institutionnel ou Page vide — chaque carte montre un schéma du modèle, sa description et son nombre de pages. Choisir un modèle applique d'office le style graphique assorti, et la case « Illustrer avec des photos libres de droits (Openverse) » remplace les images de remplissage par de vraies photos CC0 (décochez-la pour rester hors ligne). Tant que rien n'est choisi, l'aperçu derrière reste un canevas vierge (pas un site de démonstration). L'écran liste aussi vos **projets récents** (avec un bouton « En ligne » vers le site publié, le cas échéant) et un bouton *Ouvrir un projet…*. On le retrouve via ☰ → *Nouveau projet*, et Échap le referme sans rien changer.
 
 **Pour ce tutoriel, choisissez Démonstration** : trois pages — Vitrine, Article et Formulaire — qui vous serviront de matière première. (Au passage : la fenêtre retient ses dimensions d'une session à l'autre.)
 
@@ -102,7 +105,7 @@ Micro et macro sont indépendants : resserrez l'intérieur des composants sans t
 
 ## 5. Gérer les pages
 
-Le menu **⋮** à côté du nom de la page permet d'**ajouter** (Ctrl+N), **dupliquer**, **renommer** et **supprimer** des pages.
+Le menu **⋮** à côté du nom de la page permet d'**ajouter** (Ctrl+N), **dupliquer**, **renommer**, **supprimer** des pages, et **définir la page d'accueil** — celle qui sera publiée comme `index.html` (par défaut, la première du projet).
 
 Ajoutez une page : menu ⋮ → *Ajouter une page…*, nommez-la « Tarifs » et partez du modèle *Page vide*.
 
@@ -156,17 +159,32 @@ Règle d'or du design système : **pas d'attribut `class`**. Tout le style vient
 studio/
 ├── themo.conf          ← tous les tokens (format INI)
 ├── design-system.css   ← la feuille générée, à jour
+├── index.html          ← copie de la page d'accueil
 ├── vitrine.html
 ├── article.html
 ├── formulaire.html
 └── tarifs.html
 ```
 
-Des fichiers ordinaires : ouvrez `tarifs.html` dans un navigateur, il fonctionne tel quel, liens compris. Le nom de chaque page vit dans sa balise `<title>`. Rouvrez le projet plus tard avec ☰ → *Ouvrir un projet…* (Ctrl+O) : tokens et pages reviennent exactement.
+Des fichiers ordinaires : ouvrez `tarifs.html` dans un navigateur, il fonctionne tel quel, liens compris. Le nom de chaque page vit dans sa balise `<title>`. L'`index.html` est la copie de la page d'accueil (menu ⋮ → *Définir comme page d'accueil*), ce qu'un serveur web sert à la racine. Rouvrez le projet plus tard avec ☰ → *Ouvrir un projet…* (Ctrl+O), ou via ☰ → *Ouvrir un projet récent…* : tokens et pages reviennent exactement.
+
+Si vous fermez l'application avec des modifications non enregistrées, Thémo demande confirmation (Annuler / Quitter sans enregistrer / Enregistrer).
 
 Le menu ☰ propose aussi l'export seul : **Exporter le CSS…** pour la feuille uniquement, **Exporter CSS + pages HTML…** pour tout copier ailleurs sans toucher au projet.
 
-## 9. Utiliser le CSS exporté
+## 9. Publier le site en ligne
+
+Quand le site vous convient, ☰ → **Publier sur un serveur…** le met en ligne directement depuis Thémo. Trois méthodes, au choix dans le dialogue ; la destination est mémorisée par projet, et le bouton **Publier** renvoie l'adresse du site une fois l'envoi terminé.
+
+- **Netlify** — le plus simple pour débuter. Collez un *jeton d'accès personnel* (l'aide « Comment créer le jeton ? » vous guide pas à pas sur le site de Netlify). Au premier envoi, Thémo crée le site et affiche son adresse ; les fois suivantes, il met à jour le même site. Aucun serveur à gérer, HTTPS automatique.
+- **Serveur SSH** — pour un VPS ou un hébergement avec accès SSH. Indiquez `utilisateur@hôte:/chemin/` ; l'authentification se fait par clé SSH (jamais de mot de passe). L'aide « Quelles données indiquer ? » rappelle comment installer votre clé si besoin.
+- **FTP / FTPS** — l'identifiant des hébergements mutualisés classiques. Renseignez hôte, utilisateur, mot de passe et, au besoin, un dossier distant (créé s'il n'existe pas ; laissez-le vide si votre compte vous dépose déjà dans la racine du site). Laissez **« Connexion sécurisée (FTPS) »** activé.
+
+Le jeton et les mots de passe sont conservés dans le trousseau du système. Renseignez une **adresse publique** (facultative) pour que le bouton « Ouvrir » et l'écran d'accueil pointent vers votre site en ligne.
+
+> Pensez à enregistrer le projet (Ctrl+S) après la première publication : la destination (et, pour Netlify, l'identifiant du site) est alors conservée dans `themo.conf`.
+
+## 10. Utiliser le CSS exporté
 
 `design-system.css` s'utilise dans n'importe quel projet :
 
@@ -188,7 +206,7 @@ Le menu ☰ propose aussi l'export seul : **Exporter le CSS…** pour la feuille
 - **Page courante** : marquez le lien de nav avec `aria-current="page"`.
 - **Vos propres styles** : consommez les variables sémantiques — `background: var(--surface); border: 1px solid var(--border);` — elles suivent le thème clair/sombre toutes seules.
 
-## 10. Référence rapide
+## 11. Référence rapide
 
 ### Raccourcis
 
